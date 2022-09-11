@@ -1,11 +1,12 @@
 import numpy as np
+import pybullet as pb
 from skrobot.coordinates import Coordinates
 
-from mohou_bench.robot import StickPandaModel
+from mohou_bench.robot import PybulletRobotInterface, StickPandaModel
 from mohou_bench.utils import is_close
 
 
-def test_stick_panda_model():
+def test_stick_panda_model() -> None:
     model = StickPandaModel()
     model.init_pose()
     target = Coordinates(pos=(0.4, 0.0, 0.3))
@@ -14,3 +15,17 @@ def test_stick_panda_model():
     model.solve_ik(target)
 
     assert is_close(model.get_end_effector(), target)
+
+
+def test_pybullet_robot_interface() -> None:
+    pb.connect(pb.DIRECT)
+
+    model = StickPandaModel()
+    ri = PybulletRobotInterface(model)
+
+    model.init_pose()
+    ri.command_angles(model)
+    ri.wait_interpolation()
+    ri_angles = ri.get_joint_angles()
+    model_angles = model.get_joint_angles()
+    np.testing.assert_almost_equal(model_angles, ri_angles, decimal=3)

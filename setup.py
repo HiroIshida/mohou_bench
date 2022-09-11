@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup_requires = []
 
-install_requires = ["gdown"]
+install_requires = ["gdown", "scikit-robot", "pybullet"]
 
 setup(
     name="mohou_bench",
