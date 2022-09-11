@@ -86,7 +86,7 @@ class PandaModelBase(ABC):
 class StickPandaModel(PandaModelBase):
     @classmethod
     def get_urdf_path(cls) -> Path:
-        url = "https://drive.google.com/uc?id=1rVKUPgZUpgsC8rboOExNXI0zybxytU1O"
+        url = "https://drive.google.com/uc?id=1uuCFJjCqkHQcGts3lSOwhqzACfYmlWNM"
 
         urdf_path = get_cache_path() / "franka_panda_stick" / "panda.urdf"
         if urdf_path.exists():
