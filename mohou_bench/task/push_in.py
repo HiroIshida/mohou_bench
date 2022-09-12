@@ -1,9 +1,12 @@
+import pickle
+import uuid
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
 import numpy as np
 import pybullet as pb
 import pybullet_data
+from mohou.file import get_project_path
 from mohou.types import AngleVector, ElementDict, EpisodeData, RGBImage
 from skrobot.coordinates.math import rpy2quaternion, wxyz2xyzw
 
@@ -50,11 +53,11 @@ class World:
     center_table: Dict[str, np.ndarray]
     randomizer: CylinderPositionRandomizer
 
-    def __init__(self):
+    def __init__(self, n_cylinder: int):
         conf: PrimitiveConfig
 
         radius = 0.03
-        randomizer = CylinderPositionRandomizer(radius=radius)
+        randomizer = CylinderPositionRandomizer(radius=radius, n_cylinder=n_cylinder)
         center_dict = randomizer.create_table()
 
         color_list = [PybulletColor.red, PybulletColor.green, PybulletColor.blue]
@@ -109,12 +112,26 @@ class World:
 
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-m", type=int, default=2, help="number of object")
+    args = parser.parse_args()
+    n_cylinder: int = args.m
+
+    project_name = "push_cylinder{}".format(n_cylinder)
+    project_path = get_project_path(project_name)
+    project_path.mkdir(exist_ok=True)
+
+    episod_tmp_dir = project_path / "tmp_episode_cache"
+    episod_tmp_dir.mkdir(exist_ok=True)
+
     pb.connect(pb.GUI)
     pb.configureDebugVisualizer(pb.COV_ENABLE_GUI, 0)
     pb.setGravity(0, 0, -10)
     pb.setAdditionalSearchPath(pybullet_data.getDataPath())  # used by loadURDF
     pb.loadURDF("plane.urdf")
-    world = World()
+    world = World(n_cylinder)
 
     camera = Camera.create(Camera.CameraPosition.front)
     edict_list: List[ElementDict] = []
@@ -127,8 +144,17 @@ if __name__ == "__main__":
         edict_list.append(ElementDict([av, rgb]))
 
     def reset_callback():
+        global edict_list
         world.reset(randomize=True)
         com.reset()
+        print("sequence length {}".format(len(edict_list)))
+        if len(edict_list) > 0:
+            episode = EpisodeData.from_edict_list(edict_list)
+            episode_cache_path = episod_tmp_dir / "{}.pkl".format(uuid.uuid4())
+            with episode_cache_path.open(mode="wb") as f:
+                pickle.dump(episode, f)
+            print("saved episode to {}".format(episode_cache_path))
+            edict_list = []
 
     com.ps4_manager.register_callback(PS4Button.R1, lambda: reset_callback())
     com.post_command_hook = post_command_hook

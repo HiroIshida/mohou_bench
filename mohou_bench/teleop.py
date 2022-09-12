@@ -76,9 +76,9 @@ class TeleoperationCommander:
     press_time_table: Dict[Key, datetime]
     ps4_manager: PS4ControllerManager
     post_command_hook: Optional[Callable] = None
-    freq: float = 0.01
     delta: float = 0.05
-    default_step_length: int = 30
+    freq: float = 0.01
+    default_step_length: int = 50
     _init_angle_vector: Optional[np.ndarray] = None
 
     def __init__(self, robot: StickPandaModel, ri: PybulletRobotInterface):
@@ -150,7 +150,7 @@ class TeleoperationCommander:
             if not self.ps4_manager.is_running:
                 break
             command_2d = self.ps4_manager.joy_vector
-            if command_2d is not None and np.linalg.norm(command_2d) > 0:
+            if command_2d is not None and np.linalg.norm(command_2d) > 1e-3:
                 command_3d = np.array([command_2d[0], command_2d[1], 0.0])
                 try:
                     self.robot.move_end_pos(command_3d, wrt="world")
