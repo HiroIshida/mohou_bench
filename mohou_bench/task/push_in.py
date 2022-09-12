@@ -121,6 +121,19 @@ class World:
             self.set_pose(key, tuple(list(center)))  # type: ignore
 
 
+def filter_episode(episode_list: List[EpisodeData]):
+    av_init_list = []
+    for episode in episode_list:
+        av_seq = episode.get_sequence_by_type(AngleVector)
+        av_init = av_seq[0].numpy()
+        av_init_list.append(av_init)
+    av_init_arr = np.array(av_init_list)
+    av_median = np.median(av_init_arr, axis=0)
+    dists = np.sqrt(np.sum((av_init_arr - av_median) ** 2, axis=1))
+    valid_indices = np.where(dists < 0.1)[0]
+    return [episode_list[idx] for idx in valid_indices]
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -179,6 +192,7 @@ if __name__ == "__main__":
             with file_path.open("rb") as f:
                 episode = pickle.load(f)
             episode_list.append(episode)
+        episode_list = filter_episode(episode_list)
         bundle = EpisodeBundle.from_episodes(episode_list)
         bundle.dump(project_path, compress=True, exist_ok=True)
         bundle.plot_vector_histories(AngleVector, project_path)
