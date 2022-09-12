@@ -2,7 +2,7 @@ import threading
 import time
 from datetime import datetime
 from enum import Enum
-from typing import Callable, Dict, List, Optional, Set, Tuple
+from typing import Callable, Dict, Optional, Set, Tuple
 
 import numpy as np
 import pybullet as pb
@@ -14,7 +14,7 @@ from mohou_bench.robot import IKFailError, PybulletRobotInterface, StickPandaMod
 
 
 class PS4Button(Enum):
-    C = ROSS = 0
+    CROSS = 0
     CIRCLE = 1
     TRIANGLE = 2
     SQUARE = 3
@@ -24,7 +24,8 @@ class PS4Button(Enum):
 
 class PS4ControllerManager(threading.Thread):
     controller: pygame.joystick.Joystick
-    button_values: List[Optional[bool]]
+    button_values: Dict[PS4Button, Optional[bool]]
+    button_down_callbacks: Dict[PS4Button, Callable]
     joy_vector: Optional[np.ndarray] = None
     is_running: bool = True
 
@@ -36,9 +37,18 @@ class PS4ControllerManager(threading.Thread):
         controller = pygame.joystick.Joystick(0)
         controller.init()
         self.controller = controller
-        self.button_values = [None for _ in range(len(PS4Button))]
+        self.button_down_callbacks = {}
+        self.button_values = {b: None for b in PS4Button}
+        self.register_callback(PS4Button.L1, self.finish)
 
         super().__init__()
+
+    def register_callback(self, button: PS4Button, func: Callable):
+        assert button not in self.button_down_callbacks, "no override is accepted"
+        self.button_down_callbacks[button] = func
+
+    def finish(self):
+        self.is_running = False
 
     def run(self):
         while self.is_running:
@@ -49,12 +59,14 @@ class PS4ControllerManager(threading.Thread):
                     self.joy_vector = vector * 0.005
 
                 if e.type in [pygame.JOYBUTTONDOWN, pygame.JOYBUTTONUP]:
-                    for i in range(len(PS4Button)):
-                        self.button_values[i] = bool(self.controller.get_button(i))
+                    for button in PS4Button:
+                        idx = button.value
+                        self.button_values[button] = bool(self.controller.get_button(idx))
 
                 if e.type == pygame.JOYBUTTONDOWN:
-                    if self.button_values[PS4Button.L1.value]:
-                        self.is_running = False
+                    for button in self.button_down_callbacks.keys():
+                        if self.button_values[button]:
+                            self.button_down_callbacks[button]()
 
 
 class TeleoperationCommander:
