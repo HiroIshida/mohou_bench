@@ -52,6 +52,7 @@ class PS4ControllerManager(threading.Thread):
 
     def run(self):
         while self.is_running:
+            time.sleep(1e-4)
             for e in pygame.event.get():
                 if e.type == pygame.JOYAXISMOTION:
                     vector = np.array([self.controller.get_axis(0), self.controller.get_axis(1)])
