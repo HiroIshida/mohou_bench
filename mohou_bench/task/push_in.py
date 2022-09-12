@@ -1,16 +1,20 @@
 import pickle
 import uuid
 from dataclasses import dataclass
+from enum import Enum
 from typing import Dict, List, Tuple
 
 import numpy as np
 import pybullet as pb
 import pybullet_data
+from mohou.default import create_default_propagator
 from mohou.file import get_project_path
+from mohou.propagator import Propagator
 from mohou.types import AngleVector, ElementDict, EpisodeBundle, EpisodeData, RGBImage
 from skrobot.coordinates.math import rpy2quaternion, wxyz2xyzw
 
 from mohou_bench.camera import Camera
+from mohou_bench.commander import Commander
 from mohou_bench.pybullet_utils import (
     BoxConfig,
     CylinderConfig,
@@ -134,14 +138,23 @@ def filter_episode(episode_list: List[EpisodeData]):
     return [episode_list[idx] for idx in valid_indices]
 
 
+class Mode(Enum):
+    dataset = 0
+    test = 1
+    sampling = 2
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", type=int, default=2, help="number of object")
+    parser.add_argument("-mode", type=str, default="dataset", help="mode")
     args = parser.parse_args()
+    mode_str: str = args.mode
     n_cylinder: int = args.m
 
+    mode = Mode[mode_str]
     project_name = "push_cylinder{}".format(n_cylinder)
     project_path = get_project_path(project_name)
     project_path.mkdir(exist_ok=True)
@@ -157,42 +170,61 @@ if __name__ == "__main__":
     world = World(n_cylinder)
 
     camera = Camera.create(Camera.CameraPosition.frontclose)
-    edict_list: List[ElementDict] = []
 
-    com = TeleoperationCommander.create()
+    if mode == Mode.test:
+        prop = create_default_propagator(project_path, Propagator)
+        raw_com = Commander.create()
+        raw_com.reset()
 
-    def post_command_hook(com: TeleoperationCommander):
-        av = AngleVector(com.robot.get_joint_angles())
-        rgb = RGBImage(camera.render())
-        edict_list.append(ElementDict([av, rgb]))
+        for _ in range(200):
+            av = AngleVector(raw_com.ri.get_joint_angles())
+            rgb = RGBImage(camera.render())
+            edict = ElementDict([av, rgb])
+            prop.feed(edict)
 
-    def reset_callback():
-        global edict_list
-        world.reset(randomize=True)
-        com.reset()
-        print("sequence length {}".format(len(edict_list)))
+            edict_next = prop.predict(1)[0]
+            av_next = edict_next[AngleVector]
+            raw_com.send_command(av_next.numpy())
 
-        if len(edict_list) > 10:
-            episode = EpisodeData.from_edict_list(edict_list)
-            episode_cache_path = episod_tmp_dir / "{}.pkl".format(uuid.uuid4())
-            with episode_cache_path.open(mode="wb") as f:
-                pickle.dump(episode, f)
-            print("saved episode to {}".format(episode_cache_path))
-            edict_list = []
+    elif mode == Mode.dataset:
+        edict_list: List[ElementDict] = []
 
-    com.ps4_manager.register_callback(PS4Button.R1, lambda: reset_callback())
-    com.post_command_hook = post_command_hook
-    com.run()
+        com = TeleoperationCommander.create()
 
-    print("create episode bundle? [y/n]")
-    key = get_yes_no()
-    if key == "y":
-        episode_list = []
-        for file_path in episod_tmp_dir.iterdir():
-            with file_path.open("rb") as f:
-                episode = pickle.load(f)
-            episode_list.append(episode)
-        episode_list = filter_episode(episode_list)
-        bundle = EpisodeBundle.from_episodes(episode_list)
-        bundle.dump(project_path, compress=True, exist_ok=True)
-        bundle.plot_vector_histories(AngleVector, project_path)
+        def post_command_hook(com: TeleoperationCommander):
+            av = AngleVector(com.robot.get_joint_angles())
+            rgb = RGBImage(camera.render())
+            edict_list.append(ElementDict([av, rgb]))
+
+        def reset_callback():
+            global edict_list
+            world.reset(randomize=True)
+            com.reset()
+            print("sequence length {}".format(len(edict_list)))
+
+            if len(edict_list) > 10:
+                episode = EpisodeData.from_edict_list(edict_list)
+                episode_cache_path = episod_tmp_dir / "{}.pkl".format(uuid.uuid4())
+                with episode_cache_path.open(mode="wb") as f:
+                    pickle.dump(episode, f)
+                print("saved episode to {}".format(episode_cache_path))
+                edict_list = []
+
+        com.ps4_manager.register_callback(PS4Button.R1, lambda: reset_callback())
+        com.post_command_hook = post_command_hook
+        com.run()
+
+        print("create episode bundle? [y/n]")
+        key = get_yes_no()
+        if key == "y":
+            episode_list = []
+            for file_path in episod_tmp_dir.iterdir():
+                with file_path.open("rb") as f:
+                    episode = pickle.load(f)
+                episode_list.append(episode)
+            episode_list = filter_episode(episode_list)
+            bundle = EpisodeBundle.from_episodes(episode_list)
+            bundle.dump(project_path, compress=True, exist_ok=True)
+            bundle.plot_vector_histories(AngleVector, project_path)
+    else:
+        assert False
