@@ -5,12 +5,11 @@ from enum import Enum
 from typing import Callable, Dict, Optional, Set, Tuple
 
 import numpy as np
-import pybullet as pb
 import pygame
 from pynput.keyboard import Key
-from skrobot.coordinates import Coordinates
 
-from mohou_bench.robot import IKFailError, PybulletRobotInterface, StickPandaModel
+from mohou_bench.commander import Commander
+from mohou_bench.robot import IKFailError, StickPandaModel
 
 
 class PS4Button(Enum):
@@ -71,45 +70,23 @@ class PS4ControllerManager(threading.Thread):
 
 
 class TeleoperationCommander:
-    robot: StickPandaModel
-    ri: PybulletRobotInterface
+    commander: Commander
     press_time_table: Dict[Key, datetime]
     ps4_manager: PS4ControllerManager
     post_command_hook: Optional[Callable] = None
     delta: float = 0.05
     freq: float = 0.01
     default_step_length: int = 50
-    _init_angle_vector: Optional[np.ndarray] = None
 
-    def __init__(self, robot: StickPandaModel, ri: PybulletRobotInterface):
-        self.robot = robot
-        self.ri = ri
+    def __init__(self, commander: Commander):
+        self.commander = commander
         self.press_time_table = {}
         self.ps4_manager = PS4ControllerManager()
-
-        self.reset()
+        self.commander.reset()
 
     @classmethod
     def create(cls) -> "TeleoperationCommander":
-        robot = StickPandaModel()
-        ri = PybulletRobotInterface(robot)
-        return cls(robot, ri)
-
-    def reset(self) -> None:
-        self.ri.reset()
-        self.robot.init_pose()
-
-        target = Coordinates(pos=(0.3, 0.0, 0.07))
-        target.rotate(np.pi * 0.5, "y")
-        target.rotate(np.pi * 0.5, "x")
-
-        if self._init_angle_vector is None:
-            self.robot.solve_ik(target)
-            av = self.robot.get_joint_angles()
-            self._init_angle_vector = av
-
-        self.robot.set_joint_angles(list(self._init_angle_vector))
-        self.ri.reset_angles(self.robot)
+        return cls(Commander.create())
 
     def on_press(self, key: Key):
         self.press_time_table[key] = datetime.now()
@@ -137,6 +114,13 @@ class TeleoperationCommander:
             command_2d[1] -= self.delta
         return activated_keys, command_2d
 
+    @property
+    def robot(self) -> StickPandaModel:
+        return self.commander.robot
+
+    def reset(self) -> None:
+        self.commander.reset()
+
     def run(self):
         # listener = Listener(on_press=self.on_press)
         # listener.start()
@@ -153,14 +137,9 @@ class TeleoperationCommander:
             if command_2d is not None and np.linalg.norm(command_2d) > 1e-3:
                 command_3d = np.array([command_2d[0], command_2d[1], 0.0])
                 try:
-                    n_command_split = 3  # to avoid instability due to sudden move of end effector
-                    for _ in range(n_command_split):
-                        command_splitted = command_3d / float(n_command_split)
-                        self.robot.move_end_pos(command_splitted, wrt="world")
-                        self.robot.get_end_effector()
-                        self.ri.reset_angles(self.robot)
-                        for _ in range(self.default_step_length):
-                            pb.stepSimulation()
+                    self.robot.move_end_pos(command_3d, wrt="world")
+                    joint_angles_next = self.robot.get_joint_angles()
+                    self.commander.send_command(joint_angles_next)
 
                     if self.post_command_hook is not None:
                         self.post_command_hook(self)
