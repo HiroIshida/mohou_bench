@@ -7,7 +7,7 @@ import pybullet as pb
 from pynput.keyboard import Key, Listener
 from skrobot.coordinates import Coordinates
 
-from mohou_bench.robot import PybulletRobotInterface, StickPandaModel
+from mohou_bench.robot import IKFailError, PybulletRobotInterface, StickPandaModel
 
 
 class KeyboardCommander:
@@ -68,9 +68,12 @@ class KeyboardCommander:
             command_2d = self.get_2d_command()
             if np.linalg.norm(command_2d) > 0:
                 command_3d = np.array([command_2d[0], command_2d[1], 0.0])
-                self.robot.move_end_pos(command_3d, wrt="world")
-                self.robot.get_end_effector()
-                self.ri.reset_angles(self.robot)
+                try:
+                    self.robot.move_end_pos(command_3d, wrt="world")
+                    self.robot.get_end_effector()
+                    self.ri.reset_angles(self.robot)
+                except IKFailError:
+                    print("IK fail!")
 
             for _ in range(self.default_step_length):
                 pb.stepSimulation()
