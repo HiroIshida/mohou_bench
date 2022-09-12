@@ -3,7 +3,9 @@ from typing import List
 import numpy as np
 import pybullet as pb
 import pybullet_data
+from mohou.types import AngleVector, ElementDict, EpisodeData, RGBImage
 
+from mohou_bench.camera import Camera
 from mohou_bench.pybullet_utils import (
     BoxConfig,
     CylinderConfig,
@@ -31,18 +33,9 @@ def determine_cylinder_pos(n: int, r: float, rand_center: np.ndarray, std=0.03) 
     return center_list
 
 
-if __name__ == "__main__":
-    pb.connect(pb.GUI)
-    pb.configureDebugVisualizer(pb.COV_ENABLE_GUI, 0)
-    pb.setGravity(0, 0, -10)
-    pb.setAdditionalSearchPath(pybullet_data.getDataPath())  # used by loadURDF
-    pb.loadURDF("plane.urdf")
-    com = TeleoperationCommander.create()
-
+def setup_world():
     n_cylinder = 3
-
     conf: PrimitiveConfig
-
     radius = 0.03
     center_list = determine_cylinder_pos(n_cylinder, radius, np.array((0.5, 0.0)))
 
@@ -66,4 +59,24 @@ if __name__ == "__main__":
     conf = BoxConfig(size=(0.02, width, 0.02), rgba="gray")
     conf.to_pybullet_object(pos=(x_center + depth * 0.5 - 0.01, y_center), fixed=True)
 
+
+if __name__ == "__main__":
+    pb.connect(pb.GUI)
+    pb.configureDebugVisualizer(pb.COV_ENABLE_GUI, 0)
+    pb.setGravity(0, 0, -10)
+    pb.setAdditionalSearchPath(pybullet_data.getDataPath())  # used by loadURDF
+    pb.loadURDF("plane.urdf")
+    setup_world()
+
+    camera = Camera.create(Camera.CameraPosition.front)
+    edict_list: List[ElementDict] = []
+
+    def post_command_hook(com: TeleoperationCommander):
+        av = AngleVector(com.robot.get_joint_angles())
+        rgb = RGBImage(camera.render())
+        edict_list.append(ElementDict([av, rgb]))
+
+    com = TeleoperationCommander.create()
+    com.post_command_hook = post_command_hook
     com.run()
+    episode = EpisodeData.from_edict_list(edict_list)

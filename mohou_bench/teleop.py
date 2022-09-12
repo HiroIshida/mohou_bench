@@ -1,7 +1,7 @@
 import threading
 import time
 from datetime import datetime
-from typing import Dict, Optional, Set, Tuple
+from typing import Callable, Dict, Optional, Set, Tuple
 
 import numpy as np
 import pybullet as pb
@@ -44,6 +44,7 @@ class TeleoperationCommander:
     robot: StickPandaModel
     ri: PybulletRobotInterface
     press_time_table: Dict[Key, datetime]
+    post_command_hook: Optional[Callable] = None
     freq: float = 0.01
     delta: float = 0.05
     default_step_length: int = 30
@@ -112,6 +113,8 @@ class TeleoperationCommander:
                     self.robot.move_end_pos(command_3d, wrt="world")
                     self.robot.get_end_effector()
                     self.ri.reset_angles(self.robot)
+                    if self.post_command_hook is not None:
+                        self.post_command_hook(self)
                 except IKFailError:
                     print("IK fail!")
 
