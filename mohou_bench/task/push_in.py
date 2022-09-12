@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -16,37 +17,45 @@ from mohou_bench.pybullet_utils import (
 from mohou_bench.teleop import PS4Button, TeleoperationCommander
 
 
-def determine_cylinder_pos(
-    n: int, r: float, rand_center: np.ndarray, std=0.03
-) -> Dict[str, np.ndarray]:
-    assert len(rand_center) == 2
+@dataclass
+class CylinderPositionRandomizer:
+    radius: float = 0.03
+    n_cylinder: int = 3
+    std = 0.03
+    rand_center: np.ndarray = np.array((0.5, 0.0))
 
-    center_table: Dict[str, np.ndarray] = {}
+    def create_table(self) -> Dict[str, np.ndarray]:
 
-    def is_valid_position(query: np.ndarray) -> bool:
-        for center in center_table.values():
-            if np.linalg.norm(query - center) < r * 2 + 1e-3:
-                return False
-        return True
+        center_table: Dict[str, np.ndarray] = {}
 
-    idx = 0
-    while idx < n:
-        center_cand = np.hstack([rand_center + np.random.randn(2) * std, [0.01 + 1e-3]])
-        if is_valid_position(center_cand):
-            center_table["cylinder{}".format(idx)] = center_cand
-            idx += 1
-    return center_table
+        def is_valid_position(query: np.ndarray) -> bool:
+            for center in center_table.values():
+                if np.linalg.norm(query - center) < self.radius * 2 + 1e-3:
+                    return False
+            return True
+
+        idx = 0
+        while idx < self.n_cylinder:
+            center_cand = np.hstack(
+                [self.rand_center + np.random.randn(2) * self.std, [0.01 + 1e-3]]
+            )
+            if is_valid_position(center_cand):
+                center_table["cylinder{}".format(idx)] = center_cand
+                idx += 1
+        return center_table
 
 
 class World:
     id_table: Dict[str, int]
     center_table: Dict[str, np.ndarray]
+    randomizer: CylinderPositionRandomizer
 
     def __init__(self):
-        n_cylinder = 3
         conf: PrimitiveConfig
+
         radius = 0.03
-        center_dict = determine_cylinder_pos(n_cylinder, radius, np.array((0.5, 0.0)))
+        randomizer = CylinderPositionRandomizer(radius=radius)
+        center_dict = randomizer.create_table()
 
         color_list = [PybulletColor.red, PybulletColor.green, PybulletColor.blue]
         id_table = {}
@@ -59,6 +68,7 @@ class World:
 
         self.id_table = id_table
         self.center_table = center_dict
+        self.randomizer = randomizer
 
         # create goal region
         width = 0.18
@@ -90,7 +100,9 @@ class World:
             angularVelocity=(0.0, 0.0, 0.0),
         )
 
-    def reset(self):
+    def reset(self, randomize: bool = False):
+        if randomize:
+            self.center_table = self.randomizer.create_table()
         for key in self.id_table.keys():
             center = self.center_table[key]
             self.set_pose(key, tuple(list(center)))  # type: ignore
@@ -115,7 +127,7 @@ if __name__ == "__main__":
         edict_list.append(ElementDict([av, rgb]))
 
     def reset_callback():
-        world.reset()
+        world.reset(randomize=True)
         com.reset()
 
     com.ps4_manager.register_callback(PS4Button.R1, lambda: reset_callback())
