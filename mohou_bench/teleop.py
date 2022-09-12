@@ -1,7 +1,8 @@
 import threading
 import time
 from datetime import datetime
-from typing import Callable, Dict, Optional, Set, Tuple
+from enum import Enum
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 import pybullet as pb
@@ -12,8 +13,18 @@ from skrobot.coordinates import Coordinates
 from mohou_bench.robot import IKFailError, PybulletRobotInterface, StickPandaModel
 
 
+class PS4Button(Enum):
+    C = ROSS = 0
+    CIRCLE = 1
+    TRIANGLE = 2
+    SQUARE = 3
+    L1 = 4
+    L2 = 5
+
+
 class PS4ControllerManager(threading.Thread):
     controller: pygame.joystick.Joystick
+    button_values: List[Optional[bool]]
     joy_vector: Optional[np.ndarray] = None
     is_running: bool = True
 
@@ -25,6 +36,8 @@ class PS4ControllerManager(threading.Thread):
         controller = pygame.joystick.Joystick(0)
         controller.init()
         self.controller = controller
+        self.button_values = [None for _ in range(len(PS4Button))]
+
         super().__init__()
 
     def run(self):
@@ -35,8 +48,12 @@ class PS4ControllerManager(threading.Thread):
                     vector = np.flip(vector)
                     self.joy_vector = vector * 0.005
 
+                if e.type in [pygame.JOYBUTTONDOWN, pygame.JOYBUTTONUP]:
+                    for i in range(len(PS4Button)):
+                        self.button_values[i] = bool(self.controller.get_button(i))
+
                 if e.type == pygame.JOYBUTTONDOWN:
-                    if self.controller.get_button(4) == 1:
+                    if self.button_values[PS4Button.L1.value]:
                         self.is_running = False
 
 
