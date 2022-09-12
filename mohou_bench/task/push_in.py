@@ -174,17 +174,21 @@ if __name__ == "__main__":
     if mode == Mode.test:
         prop = create_default_propagator(project_path, Propagator)
         raw_com = Commander.create()
-        raw_com.reset()
 
-        for _ in range(200):
-            av = AngleVector(raw_com.ri.get_joint_angles())
-            rgb = RGBImage(camera.render())
-            edict = ElementDict([av, rgb])
-            prop.feed(edict)
+        for _ in range(100):
+            prop.reset()
+            world.reset(randomize=True)
+            raw_com.reset()
 
-            edict_next = prop.predict(1)[0]
-            av_next = edict_next[AngleVector]
-            raw_com.send_command(av_next.numpy())
+            for _ in range(200):
+                av = AngleVector(raw_com.ri.get_joint_angles())
+                rgb = RGBImage(camera.render())
+                edict = ElementDict([av, rgb])
+                prop.feed(edict)
+
+                edict_next = prop.predict(1)[0]
+                av_next = edict_next[AngleVector]
+                raw_com.send_command(av_next.numpy())
 
     elif mode == Mode.dataset:
         edict_list: List[ElementDict] = []
@@ -196,21 +200,27 @@ if __name__ == "__main__":
             rgb = RGBImage(camera.render())
             edict_list.append(ElementDict([av, rgb]))
 
-        def reset_callback():
+        def reset_callback(save_episode: bool = True):
             global edict_list
             world.reset(randomize=True)
             com.reset()
             print("sequence length {}".format(len(edict_list)))
 
-            if len(edict_list) > 10:
-                episode = EpisodeData.from_edict_list(edict_list)
-                episode_cache_path = episod_tmp_dir / "{}.pkl".format(uuid.uuid4())
-                with episode_cache_path.open(mode="wb") as f:
-                    pickle.dump(episode, f)
-                print("saved episode to {}".format(episode_cache_path))
-                edict_list = []
+            if save_episode:
+                if len(edict_list) > 10:
+                    episode = EpisodeData.from_edict_list(edict_list)
+                    episode_cache_path = episod_tmp_dir / "{}.pkl".format(uuid.uuid4())
+                    with episode_cache_path.open(mode="wb") as f:
+                        pickle.dump(episode, f)
+                    print("saved episode to {}".format(episode_cache_path))
+            else:
+                print("episode is not saved")
+            edict_list = []
 
-        com.ps4_manager.register_callback(PS4Button.R1, lambda: reset_callback())
+        com.ps4_manager.register_callback(PS4Button.CIRCLE, lambda: reset_callback())
+        com.ps4_manager.register_callback(
+            PS4Button.CROSS, lambda: reset_callback(save_episode=False)
+        )
         com.post_command_hook = post_command_hook
         com.run()
 
