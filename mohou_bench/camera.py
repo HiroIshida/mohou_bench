@@ -21,7 +21,7 @@ class Camera:
 
     class CameraPosition(Enum):
         front = ((1.9, 0, 0.7), (0.5, 0, 0.3))
-        frontclose = ((1.5, 0, 0.4), (0.5, 0, 0.3))
+        frontclose = ((1.2, 0, 0.6), (0.6, 0, 0.2))
         fronttop = ((1.3, 0, 1.2), (0.5, 0, 0.3))
         lefttop = ((0.7, 0.4, 1.5), (0.5, 0.0, 0.3))
         righttop = ((0.5, -0.9, 0.6), (0.5, -0.3, 0.3))

@@ -7,7 +7,7 @@ import numpy as np
 import pybullet as pb
 import pybullet_data
 from mohou.file import get_project_path
-from mohou.types import AngleVector, ElementDict, EpisodeData, RGBImage
+from mohou.types import AngleVector, ElementDict, EpisodeBundle, EpisodeData, RGBImage
 from skrobot.coordinates.math import rpy2quaternion, wxyz2xyzw
 
 from mohou_bench.camera import Camera
@@ -24,7 +24,7 @@ from mohou_bench.teleop import PS4Button, TeleoperationCommander
 class CylinderPositionRandomizer:
     radius: float = 0.03
     n_cylinder: int = 3
-    std = 0.03
+    std = 0.06
     rand_center: np.ndarray = np.array((0.5, 0.0))
 
     def create_table(self) -> Dict[str, np.ndarray]:
@@ -32,6 +32,9 @@ class CylinderPositionRandomizer:
         center_table: Dict[str, np.ndarray] = {}
 
         def is_valid_position(query: np.ndarray) -> bool:
+            if np.linalg.norm(query[:2] - self.rand_center) > 0.125:
+                return False
+
             for center in center_table.values():
                 if np.linalg.norm(query - center) < self.radius * 2 + 1e-3:
                     return False
@@ -46,6 +49,13 @@ class CylinderPositionRandomizer:
                 center_table["cylinder{}".format(idx)] = center_cand
                 idx += 1
         return center_table
+
+
+def get_yes_no():
+    key = input()
+    if key in ["y", "n"]:
+        return key
+    return get_yes_no()
 
 
 class World:
@@ -133,7 +143,7 @@ if __name__ == "__main__":
     pb.loadURDF("plane.urdf")
     world = World(n_cylinder)
 
-    camera = Camera.create(Camera.CameraPosition.front)
+    camera = Camera.create(Camera.CameraPosition.frontclose)
     edict_list: List[ElementDict] = []
 
     com = TeleoperationCommander.create()
@@ -148,7 +158,8 @@ if __name__ == "__main__":
         world.reset(randomize=True)
         com.reset()
         print("sequence length {}".format(len(edict_list)))
-        if len(edict_list) > 0:
+
+        if len(edict_list) > 10:
             episode = EpisodeData.from_edict_list(edict_list)
             episode_cache_path = episod_tmp_dir / "{}.pkl".format(uuid.uuid4())
             with episode_cache_path.open(mode="wb") as f:
@@ -159,4 +170,15 @@ if __name__ == "__main__":
     com.ps4_manager.register_callback(PS4Button.R1, lambda: reset_callback())
     com.post_command_hook = post_command_hook
     com.run()
-    episode = EpisodeData.from_edict_list(edict_list)
+
+    print("create episode bundle? [y/n]")
+    key = get_yes_no()
+    if key == "y":
+        episode_list = []
+        for file_path in episod_tmp_dir.iterdir():
+            with file_path.open("rb") as f:
+                episode = pickle.load(f)
+            episode_list.append(episode)
+        bundle = EpisodeBundle.from_episodes(episode_list)
+        bundle.dump(project_path, compress=True, exist_ok=True)
+        bundle.plot_vector_histories(AngleVector, project_path)
