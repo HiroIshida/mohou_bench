@@ -57,7 +57,7 @@ class PS4ControllerManager(threading.Thread):
                 if e.type == pygame.JOYAXISMOTION:
                     vector = np.array([self.controller.get_axis(0), self.controller.get_axis(1)])
                     vector = np.flip(vector)
-                    self.joy_vector = vector * 0.005
+                    self.joy_vector = vector * 0.01
 
                 if e.type in [pygame.JOYBUTTONDOWN, pygame.JOYBUTTONUP]:
                     for button in PS4Button:
@@ -153,13 +153,17 @@ class TeleoperationCommander:
             if command_2d is not None and np.linalg.norm(command_2d) > 1e-3:
                 command_3d = np.array([command_2d[0], command_2d[1], 0.0])
                 try:
-                    self.robot.move_end_pos(command_3d, wrt="world")
-                    self.robot.get_end_effector()
-                    self.ri.reset_angles(self.robot)
+                    n_command_split = 3  # to avoid instability due to sudden move of end effector
+                    for _ in range(n_command_split):
+                        command_splitted = command_3d / float(n_command_split)
+                        self.robot.move_end_pos(command_splitted, wrt="world")
+                        self.robot.get_end_effector()
+                        self.ri.reset_angles(self.robot)
+                        for _ in range(self.default_step_length):
+                            pb.stepSimulation()
+
                     if self.post_command_hook is not None:
                         self.post_command_hook(self)
+
                 except IKFailError:
                     print("IK fail!")
-
-            for _ in range(self.default_step_length):
-                pb.stepSimulation()
