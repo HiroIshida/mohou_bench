@@ -78,6 +78,7 @@ class TeleoperationCommander:
     freq: float = 0.01
     delta: float = 0.05
     default_step_length: int = 30
+    _init_angle_vector: Optional[np.ndarray] = None
 
     def __init__(self, robot: StickPandaModel, ri: PybulletRobotInterface):
         self.robot = robot
@@ -85,18 +86,29 @@ class TeleoperationCommander:
         self.press_time_table = {}
         self.ps4_manager = PS4ControllerManager()
 
+        self.reset()
+
     @classmethod
     def create(cls) -> "TeleoperationCommander":
         robot = StickPandaModel()
         ri = PybulletRobotInterface(robot)
+        return cls(robot, ri)
 
-        robot.init_pose()
+    def reset(self) -> None:
+        self.ri.reset()
+        self.robot.init_pose()
+
         target = Coordinates(pos=(0.3, 0.0, 0.07))
         target.rotate(np.pi * 0.5, "y")
         target.rotate(np.pi * 0.5, "x")
-        robot.solve_ik(target)
-        ri.reset_angles(robot)
-        return cls(robot, ri)
+
+        if self._init_angle_vector is None:
+            self.robot.solve_ik(target)
+            av = self.robot.get_joint_angles()
+            self._init_angle_vector = av
+
+        self.robot.set_joint_angles(list(self._init_angle_vector))
+        self.ri.reset_angles(self.robot)
 
     def on_press(self, key: Key):
         self.press_time_table[key] = datetime.now()

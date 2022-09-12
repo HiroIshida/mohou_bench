@@ -143,6 +143,9 @@ class PybulletRobotInterface:
     def reset(self):
         self.latest_commands = {}
 
+        for joint_id in self.joint_table.values():
+            pb.resetJointState(self.robot_id, joint_id, 0.0, targetVelocity=0.0)
+
     def command_angle(self, joint_name: str, angle: float, gain: float = 1.0, force: float = 300):
         self.latest_commands[joint_name] = angle
 
