@@ -106,7 +106,7 @@ class PrimitiveConfig(ABC):
         # create inertial
         inertial = Element("inertial")
         SubElement(inertial, "origin", rpy="0 0 0", xyz="0 0 0")
-        SubElement(inertial, "mass", value=str(self.get_name))
+        SubElement(inertial, "mass", value=str(self.get_mass()))
         ixx, iyy, izz = self.get_inertia()
         SubElement(
             inertial,
@@ -155,6 +155,38 @@ class BoxConfig(PrimitiveConfig):
     def geometry_kwargs(self) -> Dict:
         d = {}
         d["size"] = "{} {} {}".format(*self.size)
+        return d
+
+
+@dataclass
+class CylinderConfig(PrimitiveConfig):
+    radius: float
+    height: float
+    rgba: Union[str, PybulletColor, Tuple[float, float, float, float]] = (1, 1, 1, 1)
+    density: float = 1.0 * 10**3
+
+    def get_mass(self):
+        a = np.pi * self.radius**2
+        v = a * self.height
+        return v * self.density
+
+    def get_inertia(self):
+        mass = self.get_mass()
+        ixx = ((self.radius**2 / 2.0) + (self.height**2 / 12.0)) * mass
+        iyy = ixx
+        izz = mass * self.radius**2
+        return ixx, iyy, izz
+
+    def get_name(self) -> str:
+        return "cylinder"
+
+    def get_height(self) -> float:
+        return self.height
+
+    def geometry_kwargs(self) -> Dict:
+        d = {}
+        d["radius"] = str(self.radius)
+        d["length"] = str(self.height)
         return d
 
 
