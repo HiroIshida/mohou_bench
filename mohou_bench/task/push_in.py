@@ -12,7 +12,7 @@ from mohou_bench.pybullet_utils import (
     PrimitiveConfig,
     PybulletColor,
 )
-from mohou_bench.teleop import TeleoperationCommander
+from mohou_bench.teleop import PS4Button, TeleoperationCommander
 
 
 def determine_cylinder_pos(n: int, r: float, rand_center: np.ndarray, std=0.03) -> List[np.ndarray]:
@@ -77,6 +77,7 @@ if __name__ == "__main__":
         edict_list.append(ElementDict([av, rgb]))
 
     com = TeleoperationCommander.create()
+    com.ps4_manager.register_callback(PS4Button.R1, lambda: print("hoge"))
     com.post_command_hook = post_command_hook
     com.run()
     episode = EpisodeData.from_edict_list(edict_list)

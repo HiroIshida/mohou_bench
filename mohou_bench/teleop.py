@@ -19,7 +19,7 @@ class PS4Button(Enum):
     TRIANGLE = 2
     SQUARE = 3
     L1 = 4
-    L2 = 5
+    R1 = 5
 
 
 class PS4ControllerManager(threading.Thread):
@@ -73,6 +73,7 @@ class TeleoperationCommander:
     robot: StickPandaModel
     ri: PybulletRobotInterface
     press_time_table: Dict[Key, datetime]
+    ps4_manager: PS4ControllerManager
     post_command_hook: Optional[Callable] = None
     freq: float = 0.01
     delta: float = 0.05
@@ -82,6 +83,7 @@ class TeleoperationCommander:
         self.robot = robot
         self.ri = ri
         self.press_time_table = {}
+        self.ps4_manager = PS4ControllerManager()
 
     @classmethod
     def create(cls) -> "TeleoperationCommander":
@@ -125,17 +127,16 @@ class TeleoperationCommander:
     def run(self):
         # listener = Listener(on_press=self.on_press)
         # listener.start()
-        ps4_manager = PS4ControllerManager()
-        ps4_manager.start()
+        self.ps4_manager.start()
 
         while True:
             time.sleep(self.freq)
             # activated_keys, command_2d = self.process_command()
             # if "q" in activated_keys:
             #    break
-            if not ps4_manager.is_running:
+            if not self.ps4_manager.is_running:
                 break
-            command_2d = ps4_manager.joy_vector
+            command_2d = self.ps4_manager.joy_vector
             if command_2d is not None and np.linalg.norm(command_2d) > 0:
                 command_3d = np.array([command_2d[0], command_2d[1], 0.0])
                 try:
