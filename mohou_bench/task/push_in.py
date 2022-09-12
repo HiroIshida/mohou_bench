@@ -10,7 +10,7 @@ from mohou_bench.pybullet_utils import (
     PrimitiveConfig,
     PybulletColor,
 )
-from mohou_bench.teleop import KeyboardCommander
+from mohou_bench.teleop import TeleoperationCommander
 
 
 def determine_cylinder_pos(n: int, r: float, rand_center: np.ndarray, std=0.03) -> List[np.ndarray]:
@@ -37,7 +37,7 @@ if __name__ == "__main__":
     pb.setGravity(0, 0, -10)
     pb.setAdditionalSearchPath(pybullet_data.getDataPath())  # used by loadURDF
     pb.loadURDF("plane.urdf")
-    com = KeyboardCommander.create()
+    com = TeleoperationCommander.create()
 
     n_cylinder = 3
 

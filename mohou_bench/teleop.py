@@ -1,21 +1,51 @@
+import threading
 import time
 from datetime import datetime
-from typing import Dict
+from typing import Dict, Optional, Set, Tuple
 
 import numpy as np
 import pybullet as pb
-from pynput.keyboard import Key, Listener
+import pygame
+from pynput.keyboard import Key
 from skrobot.coordinates import Coordinates
 
 from mohou_bench.robot import IKFailError, PybulletRobotInterface, StickPandaModel
 
 
-class KeyboardCommander:
+class PS4ControllerManager(threading.Thread):
+    controller: pygame.joystick.Joystick
+    joy_vector: Optional[np.ndarray] = None
+    is_running: bool = True
+
+    def __init__(self):
+        pygame.init()
+        pygame.joystick.init()
+        count = pygame.joystick.get_count()
+        assert count == 1
+        controller = pygame.joystick.Joystick(0)
+        controller.init()
+        self.controller = controller
+        super().__init__()
+
+    def run(self):
+        while self.is_running:
+            for e in pygame.event.get():
+                if e.type == pygame.JOYAXISMOTION:
+                    vector = np.array([self.controller.get_axis(0), self.controller.get_axis(1)])
+                    vector = np.flip(vector)
+                    self.joy_vector = vector * 0.005
+
+                if e.type == pygame.JOYBUTTONDOWN:
+                    if self.controller.get_button(4) == 1:
+                        self.is_running = False
+
+
+class TeleoperationCommander:
     robot: StickPandaModel
     ri: PybulletRobotInterface
     press_time_table: Dict[Key, datetime]
-    freq: float = 0.1
-    delta: float = 0.005
+    freq: float = 0.01
+    delta: float = 0.05
     default_step_length: int = 30
 
     def __init__(self, robot: StickPandaModel, ri: PybulletRobotInterface):
@@ -24,7 +54,7 @@ class KeyboardCommander:
         self.press_time_table = {}
 
     @classmethod
-    def create(cls) -> "KeyboardCommander":
+    def create(cls) -> "TeleoperationCommander":
         robot = StickPandaModel()
         ri = PybulletRobotInterface(robot)
 
@@ -39,14 +69,17 @@ class KeyboardCommander:
     def on_press(self, key: Key):
         self.press_time_table[key] = datetime.now()
 
-    def get_2d_command(self) -> np.ndarray:
+    def process_command(self) -> Tuple[Set, np.ndarray]:
         now = datetime.now()
 
         activated_keys = set()
         for key, val in self.press_time_table.items():
             delta = (now - val).total_seconds()
             if delta < self.freq:
-                activated_keys.add(key)
+                if isinstance(key, Key):
+                    activated_keys.add(key)
+                else:
+                    activated_keys.add(key.char)
 
         command_2d = np.zeros(2)
         if Key.right in activated_keys:
@@ -57,16 +90,23 @@ class KeyboardCommander:
             command_2d[1] += self.delta
         if Key.down in activated_keys:
             command_2d[1] -= self.delta
-        return command_2d
+        return activated_keys, command_2d
 
     def run(self):
-        listener = Listener(on_press=self.on_press)
-        listener.start()
+        # listener = Listener(on_press=self.on_press)
+        # listener.start()
+        ps4_manager = PS4ControllerManager()
+        ps4_manager.start()
 
         while True:
             time.sleep(self.freq)
-            command_2d = self.get_2d_command()
-            if np.linalg.norm(command_2d) > 0:
+            # activated_keys, command_2d = self.process_command()
+            # if "q" in activated_keys:
+            #    break
+            if not ps4_manager.is_running:
+                break
+            command_2d = ps4_manager.joy_vector
+            if command_2d is not None and np.linalg.norm(command_2d) > 0:
                 command_3d = np.array([command_2d[0], command_2d[1], 0.0])
                 try:
                     self.robot.move_end_pos(command_3d, wrt="world")
