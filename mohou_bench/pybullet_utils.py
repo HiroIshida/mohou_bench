@@ -13,6 +13,9 @@ from skrobot.coordinates.math import rpy2quaternion, wxyz2xyzw
 
 
 class PybulletColor(Enum):
+    red = (1.0, 0.0, 0.0, 1.0)
+    green = (0.0, 1.0, 0.0, 1.0)
+    blue = (0.0, 0.0, 1.0, 1.0)
     pale_red = (1, 0.7, 0.7, 1.0)
     gray = (0.3, 0.3, 0.3, 1.0)
 
