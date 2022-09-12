@@ -1,18 +1,25 @@
 import uuid
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
-from typing import Tuple
+from typing import Optional, Sequence, Tuple, Union
 from xml.etree.ElementTree import Element, ElementTree, SubElement
 
 import numpy as np
 import pybullet as pb
 from skrobot.coordinates import Coordinates
+from skrobot.coordinates.math import rpy2quaternion, wxyz2xyzw
+
+
+class PybulletColor(Enum):
+    pale_red = (1, 0.7, 0.7, 1.0)
+    gray = (0.3, 0.3, 0.3, 1.0)
 
 
 @dataclass
 class BoxConfig:
     size: Tuple[float, float, float]
-    rgba: Tuple[float, float, float, float] = (1, 1, 1, 1)
+    rgba: Union[str, PybulletColor, Tuple[float, float, float, float]] = (1, 1, 1, 1)
     density: float = 1.0 * 10**3
     name: str = "box"
 
@@ -20,6 +27,14 @@ class BoxConfig:
     def mass(self):
         v = np.prod(self.size)
         return v * self.density
+
+    @property
+    def color(self) -> Tuple[float, float, float, float]:
+        if isinstance(self.rgba, PybulletColor):
+            return self.rgba.value
+        if isinstance(self.rgba, str):
+            return PybulletColor[self.rgba].value
+        return self.rgba
 
     @property
     def inertia(self):
@@ -35,7 +50,7 @@ def create_box_urdf(config: BoxConfig) -> Path:
 
     # create material
     material = SubElement(root, "material", name="material_name")
-    SubElement(material, "color", rgba="{} {} {} {}".format(*config.rgba))
+    SubElement(material, "color", rgba="{} {} {} {}".format(*config.color))
 
     link = SubElement(root, "link", name="base_link")
 
@@ -79,10 +94,34 @@ def create_box_urdf(config: BoxConfig) -> Path:
     return file_path
 
 
-def create_box(config: BoxConfig, friction: float = 0.7) -> int:
+def create_box(
+    config: BoxConfig,
+    pos: Optional[Sequence] = None,
+    rpy: Optional[Sequence] = None,
+    friction: float = 0.7,
+    fixed: bool = False,
+) -> int:
+
     p = create_box_urdf(config)
-    obj_id = pb.loadURDF(str(p))
+    obj_id = pb.loadURDF(str(p), useFixedBase=fixed)
     pb.changeDynamics(obj_id, -1, lateralFriction=friction)
+
+    if pos is None:
+        pos_3d = (0, 0, 0)
+    elif len(pos) == 2:
+        pos_z = config.size[2] * 0.5 + 1e-3
+        pos_3d = (pos[0], pos[1], pos_z)
+    elif len(pos) == 3:
+        pos_3d = pos
+    else:
+        assert False
+
+    if rpy is None:
+        rpy = (0, 0, 0)
+    assert len(rpy) == 3
+    q = rpy2quaternion(rpy)
+    pb.resetBasePositionAndOrientation(obj_id, pos_3d, wxyz2xyzw(q))
+
     return obj_id
 
 
