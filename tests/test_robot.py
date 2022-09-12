@@ -10,6 +10,7 @@ def test_stick_panda_model() -> None:
     model = StickPandaModel()
     model.init_pose()
     target = Coordinates(pos=(0.4, 0.0, 0.3))
+
     target.rotate(np.pi * 0.5, "y")
     target.rotate(np.pi * 0.5, "x")
     model.solve_ik(target)
@@ -29,3 +30,8 @@ def test_pybullet_robot_interface() -> None:
     ri_angles = ri.get_joint_angles()
     model_angles = model.get_joint_angles()
     np.testing.assert_almost_equal(model_angles, ri_angles, decimal=3)
+
+    model.init_pose()
+    ri.reset_angles(model)
+    ri_angles = ri.get_joint_angles()
+    np.testing.assert_almost_equal(model.get_joint_angles(), ri_angles, decimal=3)
