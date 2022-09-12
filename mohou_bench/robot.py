@@ -72,15 +72,15 @@ class PandaModelBase(ABC):
         return end_effector
 
     def move_end_pos(self, pos, wrt: str = "local") -> None:
-        end_effector = self.get_end_effector()
+        co_end_effector = self.get_end_effector().copy_worldcoords()
         pos = np.array(pos, dtype=np.float64)
-        end_effector.translate(pos, wrt=wrt)
-        self.solve_ik(end_effector)
+        co_end_effector.translate(pos, wrt=wrt)
+        self.solve_ik(co_end_effector)
 
     def move_end_rot(self, angle, axis, wrt: str = "local") -> None:
-        co_end_link = self.get_end_effector()
-        co_end_link.rotate(angle, axis, wrt=wrt)
-        self.solve_ik(co_end_link)
+        co_end_effector = self.get_end_effector().copy_worldcoords()
+        co_end_effector.rotate(angle, axis, wrt=wrt)
+        self.solve_ik(co_end_effector)
 
 
 class StickPandaModel(PandaModelBase):
@@ -163,6 +163,12 @@ class PybulletRobotInterface:
         for name in robot.control_joint_names():
             joint = robot.robot_model.__dict__[name]
             self.command_angle(name, joint.joint_angle(), gain=gain)
+
+    def reset_angles(self, robot: PandaModelBase):
+        for name in robot.control_joint_names():
+            joint = robot.robot_model.__dict__[name]
+            joint_id = self.joint_table[name]
+            pb.resetJointState(self.robot_id, joint_id, joint.joint_angle())
 
     def wait_interpolation(
         self, sleep: float = 0.0, callback: Optional[Callable] = None, vel_threshold: float = 0.05
