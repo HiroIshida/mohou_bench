@@ -106,8 +106,9 @@ def create_box(
     obj_id = pb.loadURDF(str(p), useFixedBase=fixed)
     pb.changeDynamics(obj_id, -1, lateralFriction=friction)
 
+    pos_3d: Sequence
     if pos is None:
-        pos_3d = (0, 0, 0)
+        pos_3d = (0.0, 0.0, 0.0)
     elif len(pos) == 2:
         pos_z = config.size[2] * 0.5 + 1e-3
         pos_3d = (pos[0], pos[1], pos_z)
