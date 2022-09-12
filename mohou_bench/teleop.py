@@ -15,7 +15,8 @@ class KeyboardCommander:
     ri: PybulletRobotInterface
     press_time_table: Dict[Key, datetime]
     freq: float = 0.1
-    delta: float = 0.003
+    delta: float = 0.005
+    default_step_length: int = 100
 
     def __init__(self, robot: StickPandaModel, ri: PybulletRobotInterface):
         self.robot = robot
@@ -28,7 +29,7 @@ class KeyboardCommander:
         ri = PybulletRobotInterface(robot)
 
         robot.init_pose()
-        target = Coordinates(pos=(0.4, 0.0, 0.3))
+        target = Coordinates(pos=(0.4, 0.0, 0.07))
         target.rotate(np.pi * 0.5, "y")
         target.rotate(np.pi * 0.5, "x")
         robot.solve_ik(target)
@@ -70,10 +71,6 @@ class KeyboardCommander:
                 self.robot.move_end_pos(command_3d, wrt="world")
                 self.robot.get_end_effector()
                 self.ri.reset_angles(self.robot)
-            pb.stepSimulation()
 
-
-if __name__ == "__main__":
-    pb.connect(pb.GUI)
-    com = KeyboardCommander.create()
-    com.run()
+            for _ in range(self.default_step_length):
+                pb.stepSimulation()
