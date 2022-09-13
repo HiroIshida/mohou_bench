@@ -1,3 +1,4 @@
+import argparse
 import pickle
 import uuid
 from dataclasses import dataclass
@@ -30,17 +31,22 @@ class CylinderPositionRandomizer:
     n_cylinder: int = 3
     std = 0.06
     rand_center: np.ndarray = np.array((0.5, 0.0))
+    keep_distance: bool = False
 
     def create_table(self) -> Dict[str, np.ndarray]:
 
         center_table: Dict[str, np.ndarray] = {}
+        if self.keep_distance:
+            threshold = 0.02
+        else:
+            threshold = 0.0
 
         def is_valid_position(query: np.ndarray) -> bool:
             if np.linalg.norm(query[:2] - self.rand_center) > 0.125:
                 return False
 
             for center in center_table.values():
-                if np.linalg.norm(query - center) < self.radius * 2 + 1e-3:
+                if np.linalg.norm(query - center) < self.radius * 2 + 1e-3 + threshold:
                     return False
             return True
 
@@ -67,11 +73,13 @@ class World:
     center_table: Dict[str, np.ndarray]
     randomizer: CylinderPositionRandomizer
 
-    def __init__(self, n_cylinder: int):
+    def __init__(self, n_cylinder: int, keep_distance: bool = False):
         conf: PrimitiveConfig
 
         radius = 0.03
-        randomizer = CylinderPositionRandomizer(radius=radius, n_cylinder=n_cylinder)
+        randomizer = CylinderPositionRandomizer(
+            radius=radius, n_cylinder=n_cylinder, keep_distance=keep_distance
+        )
         center_dict = randomizer.create_table()
 
         color_list = [PybulletColor.red, PybulletColor.green, PybulletColor.blue]
@@ -145,17 +153,22 @@ class Mode(Enum):
 
 
 if __name__ == "__main__":
-    import argparse
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", type=int, default=2, help="number of object")
     parser.add_argument("-mode", type=str, default="dataset", help="mode")
+    parser.add_argument("--distant", action="store_true", help="distant")
     args = parser.parse_args()
     mode_str: str = args.mode
     n_cylinder: int = args.m
+    keep_distance: bool = args.distant
 
     mode = Mode[mode_str]
     project_name = "push_cylinder{}".format(n_cylinder)
+    if keep_distance:
+        assert n_cylinder > 1
+        project_name = project_name + "-distant"
+
     project_path = get_project_path(project_name)
     project_path.mkdir(exist_ok=True)
 
@@ -167,7 +180,7 @@ if __name__ == "__main__":
     pb.setGravity(0, 0, -10)
     pb.setAdditionalSearchPath(pybullet_data.getDataPath())  # used by loadURDF
     pb.loadURDF("plane.urdf")
-    world = World(n_cylinder)
+    world = World(n_cylinder, keep_distance=keep_distance)
 
     camera = Camera.create(Camera.CameraPosition.frontclose)
 
