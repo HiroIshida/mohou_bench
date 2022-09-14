@@ -25,6 +25,7 @@ class Camera:
         fronttop = ((1.3, 0, 1.2), (0.5, 0, 0.3))
         lefttop = ((0.7, 0.4, 1.5), (0.5, 0.0, 0.3))
         righttop = ((0.5, -0.9, 0.6), (0.5, -0.3, 0.3))
+        rightfront = ((0.7, -0.9, 0.6), (0.5, -0.3, 0.3))
 
     @classmethod
     def create(cls, camera_pos: CameraPosition, n_pixel=224) -> "Camera":

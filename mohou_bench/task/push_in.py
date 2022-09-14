@@ -182,11 +182,13 @@ class WorldBase(ABC):
 
 class SingleGoalWorld(WorldBase):
     goal_region: GoalRegion
+    camera: Camera
 
     def _post_init_hook(self) -> None:
         goal_region = GoalRegion(0.18, 0.15, np.array([0.7, -0.2]))
         goal_region.create()
         self.goal_region = goal_region
+        self.camera = Camera.create(Camera.CameraPosition.frontclose)
 
     def is_successful(self) -> bool:
         for body_id in self.id_table.values():
@@ -200,6 +202,7 @@ class SingleGoalWorld(WorldBase):
 class DualGoalWorld(WorldBase):
     goal_region_left: GoalRegion
     goal_region_right: GoalRegion
+    camera: Camera
 
     def _post_init_hook(self) -> None:
         goal_region_left = GoalRegion(0.18, 0.15, np.array([0.7, -0.2]))
@@ -208,6 +211,7 @@ class DualGoalWorld(WorldBase):
         goal_region_right.create()
         self.goal_region_left = goal_region_left
         self.goal_region_right = goal_region_right
+        self.camera = Camera.create(Camera.CameraPosition.rightfront)
 
     def is_successful(self) -> bool:
         for key in self.id_table.keys():
@@ -298,8 +302,6 @@ if __name__ == "__main__":
     world_type = WorldMode[world_mode_str].value
     world = world_type(n_cylinder, keep_distance=True, use_single_color=use_single_color)
 
-    camera = Camera.create(Camera.CameraPosition.frontclose)
-
     if mode == Mode.test:
         prop: PropagatorLike
         if use_bunsetsu:
@@ -319,7 +321,7 @@ if __name__ == "__main__":
             edict_list = []
             for _ in range(250):
                 av = AngleVector(raw_com.ri.get_joint_angles())
-                rgb = RGBImage(camera.render())
+                rgb = RGBImage(world.camera.render())
                 edict = ElementDict([av, rgb])
                 edict_list.append(edict)
                 prop.feed(edict)
@@ -354,7 +356,7 @@ if __name__ == "__main__":
 
         def post_command_hook(com: TeleoperationCommander):
             av = AngleVector(com.robot.get_joint_angles())
-            rgb = RGBImage(camera.render())
+            rgb = RGBImage(world.camera.render())
             edict_list.append(ElementDict([av, rgb]))
 
         def reset_callback(save_episode: bool = True):
