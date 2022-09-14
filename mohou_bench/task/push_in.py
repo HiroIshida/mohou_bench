@@ -22,7 +22,6 @@ from mohou_bench.pybullet_utils import (
     PrimitiveConfig,
     PybulletColor,
 )
-from mohou_bench.utils import get_skrobot_coords
 from mohou_bench.robot import (
     BoxStickPandaModel,
     CylinderStickPandaModel,
@@ -30,6 +29,7 @@ from mohou_bench.robot import (
     StickPandaModelBase,
 )
 from mohou_bench.teleop import PS4Button, TeleoperationCommander
+from mohou_bench.utils import get_skrobot_coords
 
 
 @dataclass
@@ -81,7 +81,9 @@ class World:
     randomizer: CylinderPositionRandomizer
     _success_predicate: Callable[[], bool]
 
-    def __init__(self, n_cylinder: int, keep_distance: bool = False, use_single_color: bool = False):
+    def __init__(
+        self, n_cylinder: int, keep_distance: bool = False, use_single_color: bool = False
+    ):
         conf: PrimitiveConfig
 
         radius = 0.03
@@ -137,6 +139,7 @@ class World:
                 if not inside_goal_region(pos):
                     return False
             return True
+
         self._success_predicate = is_successful
 
     def is_successful(self) -> bool:
