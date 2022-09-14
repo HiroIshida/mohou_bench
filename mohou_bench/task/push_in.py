@@ -81,7 +81,7 @@ class World:
     randomizer: CylinderPositionRandomizer
     _success_predicate: Callable[[], bool]
 
-    def __init__(self, n_cylinder: int, keep_distance: bool = False):
+    def __init__(self, n_cylinder: int, keep_distance: bool = False, use_single_color: bool = False):
         conf: PrimitiveConfig
 
         radius = 0.03
@@ -90,7 +90,11 @@ class World:
         )
         center_dict = randomizer.create_table()
 
-        color_list = [PybulletColor.red, PybulletColor.green, PybulletColor.blue]
+        if use_single_color:
+            color_list = [PybulletColor.red]
+        else:
+            color_list = [PybulletColor.red, PybulletColor.green, PybulletColor.blue]
+
         id_table = {}
         for idx, name in enumerate(center_dict.keys()):
             color = color_list[idx % len(color_list)]
@@ -186,11 +190,12 @@ if __name__ == "__main__":
     parser.add_argument("-m", type=int, default=2, help="number of object")
     parser.add_argument("-mode", type=str, default="dataset", help="mode")
     parser.add_argument("-stick", type=str, default="box", help="stick model")
-    # parser.add_argument("--distant", action="store_true", help="distant")
+    parser.add_argument("--single_color", action="store_true", help="use single color")
     args = parser.parse_args()
     mode_str: str = args.mode
     n_cylinder: int = args.m
     stick_model: str = args.stick
+    use_single_color: bool = args.single_color
 
     robot_type: Type[StickPandaModelBase]
     if stick_model == "box":
@@ -204,7 +209,8 @@ if __name__ == "__main__":
 
     mode = Mode[mode_str]
     project_name = "push_{}stick_{}cylinder".format(stick_model, n_cylinder)
-
+    if use_single_color:
+        project_name += "_singlecolor"
     project_path = get_project_path(project_name)
     project_path.mkdir(exist_ok=True)
 
@@ -216,7 +222,7 @@ if __name__ == "__main__":
     pb.setGravity(0, 0, -10)
     pb.setAdditionalSearchPath(pybullet_data.getDataPath())  # used by loadURDF
     pb.loadURDF("plane.urdf")
-    world = World(n_cylinder, keep_distance=True)
+    world = World(n_cylinder, keep_distance=True, use_single_color=use_single_color)
 
     camera = Camera.create(Camera.CameraPosition.frontclose)
 
