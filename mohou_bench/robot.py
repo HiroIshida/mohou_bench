@@ -2,6 +2,7 @@ import copy
 import subprocess
 import time
 from abc import ABC, abstractmethod
+from enum import Enum
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Callable, Dict, List, Optional
@@ -83,12 +84,18 @@ class PandaModelBase(ABC):
         self.solve_ik(co_end_effector)
 
 
-class StickPandaModel(PandaModelBase):
-    @classmethod
-    def get_urdf_path(cls) -> Path:
-        url = "https://drive.google.com/uc?id=1uuCFJjCqkHQcGts3lSOwhqzACfYmlWNM"
+class StickPandaModelBase(PandaModelBase):
+    class StickModel(Enum):
+        cylinder = 0
+        box = 1
 
-        urdf_path = get_cache_path() / "franka_panda_stick" / "panda.urdf"
+    @classmethod
+    def get_urdf_path_higher(cls, stick_model: StickModel = StickModel.cylinder) -> Path:
+        url = "https://drive.google.com/uc?id=1Wp2Lw_pPx04DFWpzbwurHAzuOYpLcgL6"
+
+        urdf_path = (
+            get_cache_path() / "franka_panda_stick" / "panda_with_{}.urdf".format(stick_model.name)
+        )
         if urdf_path.exists():
             return urdf_path
 
@@ -108,6 +115,18 @@ class StickPandaModel(PandaModelBase):
     def init_pose(self):
         joint_angles = [0.7, 0.7, 0.0, -0.5, 0.0, 1.3, -0.8]
         self.set_joint_angles(joint_angles)
+
+
+class CylinderStickPandaModel(StickPandaModelBase):
+    @classmethod
+    def get_urdf_path(cls) -> Path:
+        return cls.get_urdf_path_higher(cls.StickModel.cylinder)
+
+
+class BoxStickPandaModel(StickPandaModelBase):
+    @classmethod
+    def get_urdf_path(cls) -> Path:
+        return cls.get_urdf_path_higher(cls.StickModel.box)
 
 
 class PybulletRobotInterface:

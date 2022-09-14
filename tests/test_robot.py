@@ -2,12 +2,12 @@ import numpy as np
 import pybullet as pb
 from skrobot.coordinates import Coordinates
 
-from mohou_bench.robot import PybulletRobotInterface, StickPandaModel
+from mohou_bench.robot import CylinderStickPandaModel, PybulletRobotInterface
 from mohou_bench.utils import is_close
 
 
 def test_stick_panda_model() -> None:
-    model = StickPandaModel()
+    model = CylinderStickPandaModel()
     model.init_pose()
     target = Coordinates(pos=(0.4, 0.0, 0.3))
 
@@ -21,7 +21,7 @@ def test_stick_panda_model() -> None:
 def test_pybullet_robot_interface() -> None:
     pb.connect(pb.DIRECT)
 
-    model = StickPandaModel()
+    model = CylinderStickPandaModel()
     ri = PybulletRobotInterface(model)
 
     model.init_pose()

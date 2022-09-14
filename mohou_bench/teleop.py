@@ -2,14 +2,14 @@ import threading
 import time
 from datetime import datetime
 from enum import Enum
-from typing import Callable, Dict, Optional, Set, Tuple
+from typing import Callable, Dict, Optional, Set, Tuple, Type
 
 import numpy as np
 import pygame
 from pynput.keyboard import Key
 
 from mohou_bench.commander import Commander
-from mohou_bench.robot import IKFailError, StickPandaModel
+from mohou_bench.robot import CylinderStickPandaModel, IKFailError, StickPandaModelBase
 
 
 class PS4Button(Enum):
@@ -85,8 +85,10 @@ class TeleoperationCommander:
         self.commander.reset()
 
     @classmethod
-    def create(cls) -> "TeleoperationCommander":
-        return cls(Commander.create())
+    def create(
+        cls, robot_type: Type[StickPandaModelBase] = CylinderStickPandaModel
+    ) -> "TeleoperationCommander":
+        return cls(Commander.create(robot_type))
 
     def on_press(self, key: Key):
         self.press_time_table[key] = datetime.now()
@@ -115,7 +117,7 @@ class TeleoperationCommander:
         return activated_keys, command_2d
 
     @property
-    def robot(self) -> StickPandaModel:
+    def robot(self) -> StickPandaModelBase:
         return self.commander.robot
 
     def reset(self) -> None:

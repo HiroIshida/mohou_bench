@@ -1,25 +1,29 @@
-from typing import Optional
+from typing import Optional, Type
 
 import numpy as np
 import pybullet as pb
 from skrobot.coordinates import Coordinates
 
-from mohou_bench.robot import PybulletRobotInterface, StickPandaModel
+from mohou_bench.robot import (
+    CylinderStickPandaModel,
+    PybulletRobotInterface,
+    StickPandaModelBase,
+)
 
 
 class Commander:
-    robot: StickPandaModel
+    robot: StickPandaModelBase
     ri: PybulletRobotInterface
     default_step_length: int = 50
     _init_angle_vector: Optional[np.ndarray] = None
 
-    def __init__(self, robot: StickPandaModel, ri: PybulletRobotInterface):
+    def __init__(self, robot: StickPandaModelBase, ri: PybulletRobotInterface):
         self.robot = robot
         self.ri = ri
 
     @classmethod
-    def create(cls) -> "Commander":
-        robot = StickPandaModel()
+    def create(cls, robot_type: Type[StickPandaModelBase] = CylinderStickPandaModel) -> "Commander":
+        robot = robot_type()
         ri = PybulletRobotInterface(robot)
         return cls(robot, ri)
 
