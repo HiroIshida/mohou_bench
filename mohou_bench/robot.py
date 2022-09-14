@@ -88,10 +88,11 @@ class StickPandaModelBase(PandaModelBase):
     class StickModel(Enum):
         cylinder = 0
         box = 1
+        lbox = 2
 
     @classmethod
     def get_urdf_path_higher(cls, stick_model: StickModel = StickModel.cylinder) -> Path:
-        url = "https://drive.google.com/uc?id=1Wp2Lw_pPx04DFWpzbwurHAzuOYpLcgL6"
+        url = "https://drive.google.com/uc?id=1_F3u6F-QZh0Td7mH0V-pSRyO1Sbjxpgp"
 
         urdf_path = (
             get_cache_path() / "franka_panda_stick" / "panda_with_{}.urdf".format(stick_model.name)
@@ -127,6 +128,12 @@ class BoxStickPandaModel(StickPandaModelBase):
     @classmethod
     def get_urdf_path(cls) -> Path:
         return cls.get_urdf_path_higher(cls.StickModel.box)
+
+
+class LboxStickPandaModel(StickPandaModelBase):
+    @classmethod
+    def get_urdf_path(cls) -> Path:
+        return cls.get_urdf_path_higher(cls.StickModel.lbox)
 
 
 class PybulletRobotInterface:
