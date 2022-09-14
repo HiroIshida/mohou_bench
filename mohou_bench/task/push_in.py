@@ -240,6 +240,8 @@ if __name__ == "__main__":
                     with episode_cache_path.open(mode="wb") as f:
                         pickle.dump(episode, f)
                     print("saved episode to {}".format(episode_cache_path))
+                    n_episode = len(list(episod_tmp_dir.iterdir()))
+                    print("current episode number: {}".format(n_episode))
             else:
                 print("episode is not saved")
             edict_list = []
