@@ -1,6 +1,7 @@
 import argparse
 import pickle
 import uuid
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Tuple, Type
@@ -108,11 +109,11 @@ class GoalRegion:
         return True
 
 
-class World:
+class WorldBase(ABC):
     id_table: Dict[str, int]
     center_table: Dict[str, np.ndarray]
+    color_table: Dict[str, PybulletColor]
     randomizer: CylinderPositionRandomizer
-    goal_region: GoalRegion
 
     def __init__(
         self, n_cylinder: int, keep_distance: bool = False, use_single_color: bool = False
@@ -131,29 +132,24 @@ class World:
             color_list = [PybulletColor.red, PybulletColor.green, PybulletColor.blue]
 
         id_table = {}
+        color_table = {}
         for idx, name in enumerate(center_dict.keys()):
             color = color_list[idx % len(color_list)]
             conf = CylinderConfig(radius=radius, height=0.02, rgba=color)
             center = center_dict[name]
             object_id = conf.to_pybullet_object(pos=list(center))
             id_table[name] = object_id
+            color_table[name] = color
 
         self.id_table = id_table
+        self.color_table = color_table
         self.center_table = center_dict
         self.randomizer = randomizer
+        self._post_init_hook()
 
-        # create goal region
-        goal_region = GoalRegion(0.18, 0.15, np.array([0.7, -0.2]))
-        goal_region.create()
-        self.goal_region = goal_region
-
-    def is_successful(self) -> bool:
-        for body_id in self.id_table.values():
-            co = get_skrobot_coords(body_id)
-            pos = co.translation[:2]
-            if not self.goal_region.is_inside(pos):
-                return False
-        return True
+    @abstractmethod
+    def _post_init_hook(self) -> None:
+        pass
 
     def set_pose(
         self,
@@ -176,6 +172,48 @@ class World:
         for key in self.id_table.keys():
             center = self.center_table[key]
             self.set_pose(key, tuple(list(center)))  # type: ignore
+
+
+class SingleGoalWorld(WorldBase):
+    goal_region: GoalRegion
+
+    def _post_init_hook(self) -> None:
+        goal_region = GoalRegion(0.18, 0.15, np.array([0.7, -0.2]))
+        goal_region.create()
+        self.goal_region = goal_region
+
+    def is_successful(self) -> bool:
+        for body_id in self.id_table.values():
+            co = get_skrobot_coords(body_id)
+            pos = co.translation[:2]
+            if not self.goal_region.is_inside(pos):
+                return False
+        return True
+
+
+class DualGoalWorld(WorldBase):
+    goal_region_left: GoalRegion
+    goal_region_right: GoalRegion
+
+    def _post_init_hook(self) -> None:
+        goal_region_left = GoalRegion(0.18, 0.15, np.array([0.7, -0.2]))
+        goal_region_right = GoalRegion(0.18, -0.15, np.array([0.7, -0.2]))
+        goal_region_left.create()
+        goal_region_right.create()
+        self.goal_region_left = goal_region_left
+        self.goal_region_right = goal_region_right
+
+    def is_successful(self) -> bool:
+        for key in self.id_table.keys():
+            color = self.color_table[key]
+            pos = self.center_table[key]
+            if color == PybulletColor.red:
+                if not self.goal_region_left.is_inside(pos):
+                    return False
+            elif color == PybulletColor.blue:
+                if not self.goal_region_right.is_inside(pos):
+                    return False
+        return True
 
 
 def filter_episode(episode_list: List[EpisodeData]):
@@ -235,7 +273,7 @@ if __name__ == "__main__":
     pb.setGravity(0, 0, -10)
     pb.setAdditionalSearchPath(pybullet_data.getDataPath())  # used by loadURDF
     pb.loadURDF("plane.urdf")
-    world = World(n_cylinder, keep_distance=True, use_single_color=use_single_color)
+    world = SingleGoalWorld(n_cylinder, keep_distance=True, use_single_color=use_single_color)
 
     camera = Camera.create(Camera.CameraPosition.frontclose)
 
