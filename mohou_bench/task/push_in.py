@@ -3,7 +3,7 @@ import pickle
 import uuid
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Type
 
 import numpy as np
 import pybullet as pb
@@ -21,6 +21,11 @@ from mohou_bench.pybullet_utils import (
     CylinderConfig,
     PrimitiveConfig,
     PybulletColor,
+)
+from mohou_bench.robot import (
+    BoxStickPandaModel,
+    CylinderStickPandaModel,
+    StickPandaModelBase,
 )
 from mohou_bench.teleop import PS4Button, TeleoperationCommander
 
@@ -157,11 +162,21 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", type=int, default=2, help="number of object")
     parser.add_argument("-mode", type=str, default="dataset", help="mode")
+    parser.add_argument("-stick", type=str, default="box", help="stick model")
     parser.add_argument("--distant", action="store_true", help="distant")
     args = parser.parse_args()
     mode_str: str = args.mode
     n_cylinder: int = args.m
     keep_distance: bool = args.distant
+    stick_model: str = args.stick
+
+    robot_type: Type[StickPandaModelBase]
+    if stick_model == "box":
+        robot_type = BoxStickPandaModel
+    elif stick_model == "cylinder":
+        robot_type = CylinderStickPandaModel
+    else:
+        assert False
 
     mode = Mode[mode_str]
     project_name = "push_cylinder{}".format(n_cylinder)
@@ -186,7 +201,7 @@ if __name__ == "__main__":
 
     if mode == Mode.test:
         prop = create_default_propagator(project_path, Propagator)
-        raw_com = Commander.create()
+        raw_com = Commander.create(robot_type=robot_type)
 
         for _ in range(100):
             prop.reset()
@@ -206,7 +221,7 @@ if __name__ == "__main__":
     elif mode == Mode.dataset:
         edict_list: List[ElementDict] = []
 
-        com = TeleoperationCommander.create()
+        com = TeleoperationCommander.create(robot_type=robot_type)
 
         def post_command_hook(com: TeleoperationCommander):
             av = AngleVector(com.robot.get_joint_angles())
