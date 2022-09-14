@@ -3,7 +3,7 @@ import pickle
 import uuid
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, Dict, List, Tuple, Type
+from typing import Dict, List, Tuple, Type
 
 import numpy as np
 import pybullet as pb
@@ -11,7 +11,14 @@ import pybullet_data
 from mohou.default import create_default_propagator
 from mohou.file import get_project_path
 from mohou.propagator import Propagator
-from mohou.types import AngleVector, ElementDict, EpisodeBundle, EpisodeData, RGBImage
+from mohou.types import (
+    AngleVector,
+    ElementDict,
+    EpisodeBundle,
+    EpisodeData,
+    MetaData,
+    RGBImage,
+)
 from skrobot.coordinates.math import rpy2quaternion, wxyz2xyzw
 
 from mohou_bench.camera import Camera
@@ -75,11 +82,26 @@ def get_yes_no():
     return get_yes_no()
 
 
+@dataclass
+class GoalRegion:
+    width: float
+    depth: float
+    center: np.ndarray
+
+    def is_inside(self, x: np.ndarray) -> bool:
+        abs_diff = np.abs(x - self.center)
+        if abs_diff[0] > self.depth * 0.5:
+            return False
+        if abs_diff[1] > self.width * 0.5:
+            return False
+        return True
+
+
 class World:
     id_table: Dict[str, int]
     center_table: Dict[str, np.ndarray]
     randomizer: CylinderPositionRandomizer
-    _success_predicate: Callable[[], bool]
+    goal_region: GoalRegion
 
     def __init__(
         self, n_cylinder: int, keep_distance: bool = False, use_single_color: bool = False
@@ -124,26 +146,15 @@ class World:
         conf = BoxConfig(size=(0.02, width, 0.02), rgba="gray")
         conf.to_pybullet_object(pos=(x_center + depth * 0.5 - 0.01, y_center), fixed=True)
 
-        def inside_goal_region(x) -> bool:
-            abs_diff = np.abs(x - np.array([x_center, y_center]))
-            if abs_diff[0] > depth * 0.5:
-                return False
-            if abs_diff[1] > width * 0.5:
-                return False
-            return True
-
-        def is_successful() -> bool:
-            for body_id in self.id_table.values():
-                co = get_skrobot_coords(body_id)
-                pos = co.translation[:2]
-                if not inside_goal_region(pos):
-                    return False
-            return True
-
-        self._success_predicate = is_successful
+        self.goal_region = GoalRegion(width, depth, np.array([x_center, y_center]))
 
     def is_successful(self) -> bool:
-        return self._success_predicate()
+        for body_id in self.id_table.values():
+            co = get_skrobot_coords(body_id)
+            pos = co.translation[:2]
+            if not self.goal_region.is_inside(pos):
+                return False
+        return True
 
     def set_pose(
         self,
@@ -233,23 +244,46 @@ if __name__ == "__main__":
         prop = create_default_propagator(project_path, Propagator)
         raw_com = Commander.create(robot_type=robot_type)
 
+        success_count = 0
+        episode_list = []
         for _ in range(100):
             prop.reset()
             world.reset(randomize=True)
             raw_com.reset()
 
-            for _ in range(200):
+            edict_list = []
+            for _ in range(250):
                 av = AngleVector(raw_com.ri.get_joint_angles())
                 rgb = RGBImage(camera.render())
                 edict = ElementDict([av, rgb])
+                edict_list.append(edict)
                 prop.feed(edict)
 
                 edict_next = prop.predict(1)[0]
                 av_next = edict_next[AngleVector]
                 raw_com.send_command(av_next.numpy())
 
+            # post trial
+            is_successful = world.is_successful()
+            episode_metadata = MetaData({"success": is_successful})
+            episode = EpisodeData.from_edict_list(
+                edict_list, metadata=episode_metadata, check_terminate_flag=False
+            )
+            episode_list.append(episode)
+            if is_successful:
+                success_count += 1
+            n_trial = len(episode_list)
+            success_rate = success_count / float(n_trial)
+            print("trail: {}, success rate: {}".format(n_trial, success_rate))
+
+        metadata = MetaData({"success_rate": success_count / float(len(episode_list))})
+        bundle = EpisodeBundle.from_episodes(episode_list, meta_data=metadata)
+        sampling_result_path = project_path / "sampling_result"
+        sampling_result_path.mkdir(exist_ok=True)
+        bundle.dump(sampling_result_path, postfix=str(uuid.uuid4()), compress=True)
+
     elif mode == Mode.dataset:
-        edict_list: List[ElementDict] = []
+        edict_list: List[ElementDict] = []  # type: ignore
 
         com = TeleoperationCommander.create(robot_type=robot_type)
 
