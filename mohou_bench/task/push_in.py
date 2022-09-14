@@ -163,7 +163,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", type=int, default=2, help="number of object")
     parser.add_argument("-mode", type=str, default="dataset", help="mode")
-    parser.add_argument("-stick", type=str, default="lbox", help="stick model")
+    parser.add_argument("-stick", type=str, default="box", help="stick model")
     # parser.add_argument("--distant", action="store_true", help="distant")
     args = parser.parse_args()
     mode_str: str = args.mode
