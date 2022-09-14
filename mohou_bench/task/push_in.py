@@ -163,11 +163,10 @@ if __name__ == "__main__":
     parser.add_argument("-m", type=int, default=2, help="number of object")
     parser.add_argument("-mode", type=str, default="dataset", help="mode")
     parser.add_argument("-stick", type=str, default="box", help="stick model")
-    parser.add_argument("--distant", action="store_true", help="distant")
+    # parser.add_argument("--distant", action="store_true", help="distant")
     args = parser.parse_args()
     mode_str: str = args.mode
     n_cylinder: int = args.m
-    keep_distance: bool = args.distant
     stick_model: str = args.stick
 
     robot_type: Type[StickPandaModelBase]
@@ -179,10 +178,7 @@ if __name__ == "__main__":
         assert False
 
     mode = Mode[mode_str]
-    project_name = "push_cylinder{}".format(n_cylinder)
-    if keep_distance:
-        assert n_cylinder > 1
-        project_name = project_name + "-distant"
+    project_name = "push_{}stick_{}cylinder".format(stick_model, n_cylinder)
 
     project_path = get_project_path(project_name)
     project_path.mkdir(exist_ok=True)
@@ -195,7 +191,7 @@ if __name__ == "__main__":
     pb.setGravity(0, 0, -10)
     pb.setAdditionalSearchPath(pybullet_data.getDataPath())  # used by loadURDF
     pb.loadURDF("plane.urdf")
-    world = World(n_cylinder, keep_distance=keep_distance)
+    world = World(n_cylinder, keep_distance=True)
 
     camera = Camera.create(Camera.CameraPosition.frontclose)
 
