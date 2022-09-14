@@ -197,7 +197,7 @@ class DualGoalWorld(WorldBase):
 
     def _post_init_hook(self) -> None:
         goal_region_left = GoalRegion(0.18, 0.15, np.array([0.7, -0.2]))
-        goal_region_right = GoalRegion(0.18, -0.15, np.array([0.7, -0.2]))
+        goal_region_right = GoalRegion(0.18, 0.15, np.array([0.7, +0.2]))
         goal_region_left.create()
         goal_region_right.create()
         self.goal_region_left = goal_region_left
@@ -235,18 +235,25 @@ class Mode(Enum):
     sampling = 2
 
 
+class WorldMode(Enum):
+    single = SingleGoalWorld
+    dual = DualGoalWorld
+
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", type=int, default=2, help="number of object")
     parser.add_argument("-mode", type=str, default="dataset", help="mode")
     parser.add_argument("-stick", type=str, default="box", help="stick model")
+    parser.add_argument("-world", type=str, default="single", help="single goal world")
     parser.add_argument("--single_color", action="store_true", help="use single color")
     args = parser.parse_args()
     mode_str: str = args.mode
     n_cylinder: int = args.m
     stick_model: str = args.stick
     use_single_color: bool = args.single_color
+    world_mode_str: str = args.world
 
     robot_type: Type[StickPandaModelBase]
     if stick_model == "box":
@@ -273,7 +280,8 @@ if __name__ == "__main__":
     pb.setGravity(0, 0, -10)
     pb.setAdditionalSearchPath(pybullet_data.getDataPath())  # used by loadURDF
     pb.loadURDF("plane.urdf")
-    world = SingleGoalWorld(n_cylinder, keep_distance=True, use_single_color=use_single_color)
+    world_type = WorldMode[world_mode_str].value
+    world = world_type(n_cylinder, keep_distance=True, use_single_color=use_single_color)
 
     camera = Camera.create(Camera.CameraPosition.frontclose)
 
