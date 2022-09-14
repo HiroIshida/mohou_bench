@@ -9,6 +9,8 @@ from typing import Dict, List, Tuple, Type
 import numpy as np
 import pybullet as pb
 import pybullet_data
+from bunsetsu.file import get_segmentation_path
+from bunsetsu.propagator import SequentialPropagator
 from mohou.default import create_default_propagator
 from mohou.file import get_project_path
 from mohou.propagator import Propagator
@@ -37,7 +39,7 @@ from mohou_bench.robot import (
     StickPandaModelBase,
 )
 from mohou_bench.teleop import PS4Button, TeleoperationCommander
-from mohou_bench.utils import get_skrobot_coords
+from mohou_bench.utils import PropagatorLike, get_skrobot_coords
 
 
 @dataclass
@@ -256,11 +258,13 @@ if __name__ == "__main__":
     parser.add_argument("-stick", type=str, default="box", help="stick model")
     parser.add_argument("-world", type=str, default="single", help="single goal world")
     parser.add_argument("--single_color", action="store_true", help="use single color")
+    parser.add_argument("--bunsetsu", action="store_true", help="use segmented policy")
     args = parser.parse_args()
     mode_str: str = args.mode
     n_cylinder: int = args.m
     stick_model: str = args.stick
     use_single_color: bool = args.single_color
+    use_bunsetsu: bool = args.bunsetsu
     world_mode_str: str = args.world
 
     robot_type: Type[StickPandaModelBase]
@@ -277,6 +281,9 @@ if __name__ == "__main__":
     project_name = "push_{}stick_{}cylinder".format(stick_model, n_cylinder)
     if use_single_color:
         project_name += "_singlecolor"
+    if world_mode_str != "single":
+        project_name += "_{}".format(world_mode_str)
+
     project_path = get_project_path(project_name)
     project_path.mkdir(exist_ok=True)
 
@@ -294,7 +301,12 @@ if __name__ == "__main__":
     camera = Camera.create(Camera.CameraPosition.frontclose)
 
     if mode == Mode.test:
-        prop = create_default_propagator(project_path, Propagator)
+        prop: PropagatorLike
+        if use_bunsetsu:
+            sp = get_segmentation_path(project_path, "arhmm2")
+            prop = SequentialPropagator.load(sp)
+        else:
+            prop = create_default_propagator(project_path, Propagator)
         raw_com = Commander.create(robot_type=robot_type)
 
         success_count = 0

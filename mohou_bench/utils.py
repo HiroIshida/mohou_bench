@@ -1,5 +1,8 @@
+from typing import List, Protocol
+
 import numpy as np
 import pybullet as pb
+from mohou.types import ElementDict
 from skrobot.coordinates import Coordinates
 from skrobot.coordinates.math import quaternion2matrix, xyzw2wxyz
 
@@ -23,3 +26,14 @@ def get_skrobot_coords(body_id: int) -> Coordinates:
     trans, quat = pb.getBasePositionAndOrientation(body_id)
     mat = quaternion2matrix(xyzw2wxyz(quat))
     return Coordinates(trans, mat)
+
+
+class PropagatorLike(Protocol):
+    def reset(self) -> None:
+        pass
+
+    def feed(self, elem_dict: ElementDict) -> None:
+        pass
+
+    def predict(self, n_prop: int) -> List[ElementDict]:
+        pass
