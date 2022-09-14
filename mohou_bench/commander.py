@@ -31,7 +31,7 @@ class Commander:
         self.ri.reset()
         self.robot.init_pose()
 
-        target = Coordinates(pos=(0.3, 0.0, 0.07))
+        target = Coordinates(pos=(0.3, -0.1, 0.07))
         target.rotate(np.pi * 0.5, "y")
         target.rotate(np.pi * 0.5, "x")
 

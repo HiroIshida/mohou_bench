@@ -36,7 +36,7 @@ class CylinderPositionRandomizer:
     radius: float = 0.03
     n_cylinder: int = 3
     std = 0.06
-    rand_center: np.ndarray = np.array((0.5, 0.0))
+    rand_center: np.ndarray = np.array((0.45, 0.0))
     keep_distance: bool = False
 
     def create_table(self) -> Dict[str, np.ndarray]:
