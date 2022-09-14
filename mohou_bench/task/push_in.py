@@ -88,6 +88,17 @@ class GoalRegion:
     depth: float
     center: np.ndarray
 
+    def create(self):
+        x_center, y_center = self.center
+        conf = BoxConfig(size=(self.depth, 0.02, 0.02), rgba="gray")
+        conf.to_pybullet_object(pos=(x_center, y_center - 0.5 * self.width), fixed=True)
+
+        conf = BoxConfig(size=(self.depth, 0.02, 0.02), rgba="gray")
+        conf.to_pybullet_object(pos=(x_center, y_center + 0.5 * self.width), fixed=True)
+
+        conf = BoxConfig(size=(0.02, self.width, 0.02), rgba="gray")
+        conf.to_pybullet_object(pos=(x_center + self.depth * 0.5 - 0.01, y_center), fixed=True)
+
     def is_inside(self, x: np.ndarray) -> bool:
         abs_diff = np.abs(x - self.center)
         if abs_diff[0] > self.depth * 0.5:
@@ -132,21 +143,9 @@ class World:
         self.randomizer = randomizer
 
         # create goal region
-        width = 0.18
-        depth = 0.15
-        y_center = -0.2
-        x_center = 0.7
-
-        conf = BoxConfig(size=(depth, 0.02, 0.02), rgba="gray")
-        conf.to_pybullet_object(pos=(x_center, y_center - 0.5 * width), fixed=True)
-
-        conf = BoxConfig(size=(depth, 0.02, 0.02), rgba="gray")
-        conf.to_pybullet_object(pos=(x_center, y_center + 0.5 * width), fixed=True)
-
-        conf = BoxConfig(size=(0.02, width, 0.02), rgba="gray")
-        conf.to_pybullet_object(pos=(x_center + depth * 0.5 - 0.01, y_center), fixed=True)
-
-        self.goal_region = GoalRegion(width, depth, np.array([x_center, y_center]))
+        goal_region = GoalRegion(0.18, 0.15, np.array([0.7, -0.2]))
+        goal_region.create()
+        self.goal_region = goal_region
 
     def is_successful(self) -> bool:
         for body_id in self.id_table.values():
