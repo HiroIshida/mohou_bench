@@ -151,6 +151,10 @@ class WorldBase(ABC):
     def _post_init_hook(self) -> None:
         pass
 
+    @abstractmethod
+    def is_successful(self) -> bool:
+        pass
+
     def set_pose(
         self,
         body_name: str,
@@ -206,13 +210,17 @@ class DualGoalWorld(WorldBase):
     def is_successful(self) -> bool:
         for key in self.id_table.keys():
             color = self.color_table[key]
-            pos = self.center_table[key]
+            body_id = self.id_table[key]
+            co = get_skrobot_coords(body_id)
+            pos = co.translation[:2]
             if color == PybulletColor.red:
                 if not self.goal_region_left.is_inside(pos):
                     return False
-            elif color == PybulletColor.blue:
+            elif color == PybulletColor.green:
                 if not self.goal_region_right.is_inside(pos):
                     return False
+            else:
+                assert False
         return True
 
 
@@ -339,6 +347,7 @@ if __name__ == "__main__":
 
         def reset_callback(save_episode: bool = True):
             global edict_list
+            print("success? {}".format(world.is_successful()))
             world.reset(randomize=True)
             com.reset()
             print("sequence length {}".format(len(edict_list)))
