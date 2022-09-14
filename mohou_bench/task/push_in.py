@@ -3,7 +3,7 @@ import pickle
 import uuid
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Tuple, Type
+from typing import Callable, Dict, List, Tuple, Type
 
 import numpy as np
 import pybullet as pb
@@ -22,6 +22,7 @@ from mohou_bench.pybullet_utils import (
     PrimitiveConfig,
     PybulletColor,
 )
+from mohou_bench.utils import get_skrobot_coords
 from mohou_bench.robot import (
     BoxStickPandaModel,
     CylinderStickPandaModel,
@@ -78,6 +79,7 @@ class World:
     id_table: Dict[str, int]
     center_table: Dict[str, np.ndarray]
     randomizer: CylinderPositionRandomizer
+    _success_predicate: Callable[[], bool]
 
     def __init__(self, n_cylinder: int, keep_distance: bool = False):
         conf: PrimitiveConfig
@@ -115,6 +117,26 @@ class World:
 
         conf = BoxConfig(size=(0.02, width, 0.02), rgba="gray")
         conf.to_pybullet_object(pos=(x_center + depth * 0.5 - 0.01, y_center), fixed=True)
+
+        def inside_goal_region(x) -> bool:
+            abs_diff = np.abs(x - np.array([x_center, y_center]))
+            if abs_diff[0] > depth * 0.5:
+                return False
+            if abs_diff[1] > width * 0.5:
+                return False
+            return True
+
+        def is_successful() -> bool:
+            for body_id in self.id_table.values():
+                co = get_skrobot_coords(body_id)
+                pos = co.translation[:2]
+                if not inside_goal_region(pos):
+                    return False
+            return True
+        self._success_predicate = is_successful
+
+    def is_successful(self) -> bool:
+        return self._success_predicate()
 
     def set_pose(
         self,
