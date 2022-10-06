@@ -11,9 +11,8 @@ import pybullet as pb
 import pybullet_data
 from bunsetsu.file import get_segmentation_path
 from bunsetsu.propagator import SequentialPropagator
-from mohou.default import create_default_propagator
 from mohou.file import get_project_path
-from mohou.propagator import Propagator
+from mohou.propagator import LSTMPropagator
 from mohou.types import (
     AngleVector,
     ElementDict,
@@ -308,7 +307,7 @@ if __name__ == "__main__":
             sp = get_segmentation_path(project_path, "arhmm2")
             prop = SequentialPropagator.load(sp)
         else:
-            prop = create_default_propagator(project_path, Propagator)
+            prop = LSTMPropagator.create_default(project_path)
         raw_com = Commander.create(robot_type=robot_type)
 
         success_count = 0
