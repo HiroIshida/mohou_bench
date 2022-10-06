@@ -1,3 +1,4 @@
+import copy
 import time
 from dataclasses import dataclass
 from typing import Dict, Tuple
@@ -5,10 +6,18 @@ from typing import Dict, Tuple
 import numpy as np
 import pybullet as pb
 import pybullet_data
-from skrobot.coordinates.math import rpy2quaternion, wxyz2xyzw
+from skrobot.coordinates import Coordinates
+from skrobot.coordinates.math import (
+    quaternion2matrix,
+    rpy2quaternion,
+    wxyz2xyzw,
+    xyzw2wxyz,
+)
 
 from mohou_bench.asset import get_fryingpan_urdf_path
 from mohou_bench.commander import Commander
+from mohou_bench.pybullet_utils import create_debug_axis
+from mohou_bench.robot import GripperPandaModel
 
 
 @dataclass
@@ -18,6 +27,8 @@ class World:
 
     @classmethod
     def create(cls):
+        pb.loadURDF("plane.urdf")
+
         frypan_path_str = get_fryingpan_urdf_path()
         pan_id = pb.loadURDF(str(frypan_path_str))
         id_table = {"pan": pan_id}
@@ -40,6 +51,13 @@ class World:
             angularVelocity=(0.0, 0.0, 0.0),
         )
 
+    def get_skrobot_coords(self, body_name: str) -> Coordinates:
+        # NOTE quat is xyzw order
+        body_id = self.id_table[body_name]
+        trans, quat = pb.getBasePositionAndOrientation(body_id)
+        mat = quaternion2matrix(xyzw2wxyz(quat))
+        return Coordinates(trans, mat)
+
     def reset(self, randomize: bool = False):
         if randomize:
             self.randomize()
@@ -51,11 +69,51 @@ class World:
             self.set_pose(key, point, rpy)  # type: ignore
 
     def randomize(self) -> None:
-        c_nominal = np.array([0.6, 0.0, np.pi * 0.5])
+        c_nominal = np.array([0.5, 0.0, np.pi * 0.5])
         width = np.array([0.2, 0.2, 0.6])
         c = c_nominal - width * 0.5 + np.random.rand(3) * width
         print(c)
         self.configuration_table["pan"] = c
+
+
+def oracle_rollout(commander: Commander, world: World):
+    robot_model = copy.deepcopy(commander.robot)
+
+    av_init = robot_model.get_joint_angles()
+
+    co = world.get_skrobot_coords("pan")
+    co.translate([0.15, 0.0, 0.15])
+    co.rotate(np.pi * 0.5, "y")
+    co.rotate(np.pi * 1.0, "x")
+    create_debug_axis(co)
+
+    robot_model.solve_ik(co)
+    av_pre_grasp = robot_model.get_joint_angles()
+
+    co.translate([0.0, 0.0, -0.16], "world")
+    robot_model.solve_ik(co)
+    av_grasp = robot_model.get_joint_angles()
+
+    n_point_pregrasp = 70
+    n_point_grasp = 30
+    width_pregrasp = (av_pre_grasp - av_init) / (n_point_pregrasp - 1)  # type: ignore
+    av_list = [av_init + width_pregrasp * i for i in range(n_point_pregrasp)]
+    av_list.pop()
+
+    width_grasp = (av_grasp - av_pre_grasp) / (n_point_grasp - 1)  # type: ignore
+    av_list.extend([av_pre_grasp + width_grasp * i for i in range(n_point_grasp)])
+
+    for av in av_list:
+        commander.send_command(av)
+        time.sleep(0.01)
+
+
+def reset(commander: Commander, world: World):
+    commander.reset()
+    robot_model = copy.deepcopy(commander.robot)
+    robot_model.move_end_pos([0.05, 0.0, 0.2], wrt="world")
+    commander.send_command(robot_model.get_joint_angles())
+    world.reset()
 
 
 CLIENT = pb.connect(pb.GUI)
@@ -63,10 +121,8 @@ pb.setAdditionalSearchPath(pybullet_data.getDataPath())  # used by loadURDF
 pb.configureDebugVisualizer(pb.COV_ENABLE_GUI, 0)
 pb.configureDebugVisualizer(pb.COV_ENABLE_SHADOWS, 0)
 pb.setGravity(0, 0, -10)
-w = World.create()
-w.reset()
-com = Commander.create()
+com = Commander.create(robot_type=GripperPandaModel)
+world = World.create()
 
-for i in range(10):
-    w.reset(randomize=True)
-    time.sleep(3)
+reset(com, world)
+oracle_rollout(com, world)

@@ -35,6 +35,10 @@ class PandaModelBase(ABC):
     def get_urdf_path(cls) -> Path:
         pass
 
+    def init_pose(self) -> None:
+        joint_angles = [0.7, 0.7, 0.0, -0.5, 0.0, 1.3, -0.8]
+        self.set_joint_angles(joint_angles)
+
     def get_end_effector_name(self) -> str:
         return "panda_grasptarget"
 
@@ -82,7 +86,6 @@ class PandaModelBase(ABC):
 
 class GripperPandaModel(PandaModelBase):
     @classmethod
-    @abstractmethod
     def get_urdf_path(cls) -> Path:
         return get_panda_urdf_path()
 
@@ -114,10 +117,6 @@ class StickPandaModelBase(PandaModelBase):
             )
             subprocess.run(cmd, shell=True)
         return urdf_path
-
-    def init_pose(self):
-        joint_angles = [0.7, 0.7, 0.0, -0.5, 0.0, 1.3, -0.8]
-        self.set_joint_angles(joint_angles)
 
 
 class CylinderStickPandaModel(StickPandaModelBase):

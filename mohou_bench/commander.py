@@ -6,13 +6,14 @@ from skrobot.coordinates import Coordinates
 
 from mohou_bench.robot import (
     CylinderStickPandaModel,
+    PandaModelBase,
     PybulletRobotInterface,
     StickPandaModelBase,
 )
 
 
 class Commander:
-    robot: StickPandaModelBase
+    robot: PandaModelBase
     ri: PybulletRobotInterface
     default_step_length: int = 50
     _init_angle_vector: Optional[np.ndarray] = None
