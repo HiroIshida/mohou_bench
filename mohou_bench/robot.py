@@ -15,11 +15,7 @@ from skrobot.coordinates import Coordinates
 from skrobot.model import RobotModel
 from skrobot.models.urdf import RobotModelFromURDF
 
-
-def get_cache_path() -> Path:
-    p = Path("~/.cache/mohou_bench").expanduser()
-    p.mkdir(exist_ok=True)
-    return p
+from mohou_bench.asset import get_cache_path
 
 
 class IKFailError(Exception):
@@ -99,6 +95,8 @@ class StickPandaModelBase(PandaModelBase):
 
     @classmethod
     def get_urdf_path_higher(cls, stick_model: StickModel = StickModel.cylinder) -> Path:
+        # TODO: This function shold be moved to asset.py
+
         url = "https://drive.google.com/uc?id=1_F3u6F-QZh0Td7mH0V-pSRyO1Sbjxpgp"
 
         urdf_path = (
