@@ -7,6 +7,7 @@ from skrobot.coordinates import Coordinates
 
 from mohou_bench.robot import (
     CylinderStickPandaModel,
+    GripperPandaModel,
     PandaModelBase,
     PybulletRobotInterface,
 )
@@ -43,13 +44,29 @@ class Commander:
 
     def send_command(self, robot_model: PandaModelBase):
         joint_angles = robot_model.get_joint_angles()
+        if isinstance(robot_model, GripperPandaModel):
+            gripper_angles = robot_model.get_gripper_joints()
+        else:
+            gripper_angles = None
+
         n_command_split = 3  # to avoid instability due to sudden move of end effector
         angles_now = self.ri.get_joint_angles()
         angles_diff = (joint_angles - angles_now) / float(n_command_split)
+
+        if isinstance(robot_model, GripperPandaModel):
+            g_now = self.ri.get_gripper_angles()
+            g_diff = (gripper_angles - g_now) / float(n_command_split)
 
         for i in range(n_command_split):
             angles_sub_next = angles_now + angles_diff * (i + 1)
             self.robot.set_joint_angles(angles_sub_next)
             self.ri.reset_angles(self.robot)
+
+            if isinstance(robot_model, GripperPandaModel):
+                assert isinstance(self.robot, GripperPandaModel)
+                g_sub_next = g_now + g_diff * (i + 1)  # type: ignore
+                self.robot.set_gripper_joints(g_sub_next)
+                self.ri.reset_gripper_pos(self.robot)
+
             for _ in range(self.default_step_length):
                 pb.stepSimulation()

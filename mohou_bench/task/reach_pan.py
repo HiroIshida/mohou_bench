@@ -90,7 +90,7 @@ def oracle_rollout(commander: Commander, world: World):
     robot_model.solve_ik(co)
     av_pre_grasp = robot_model.get_joint_angles()
 
-    co.translate([0.0, 0.0, -0.16], "world")
+    co.translate([0.0, 0.0, -0.12], "world")
     robot_model.solve_ik(co)
     av_grasp = robot_model.get_joint_angles()
 
@@ -111,8 +111,9 @@ def oracle_rollout(commander: Commander, world: World):
 
 def reset(commander: Commander, world: World):
     commander.reset()
-    robot_model = copy.deepcopy(commander.robot)
+    robot_model: GripperPandaModel = copy.deepcopy(commander.robot)
     robot_model.move_end_pos([0.05, 0.0, 0.2], wrt="world")
+    robot_model.set_gripper_joints([0.04, 0.04])
     commander.send_command(robot_model)
     world.reset()
 

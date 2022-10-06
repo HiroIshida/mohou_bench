@@ -89,6 +89,17 @@ class GripperPandaModel(PandaModelBase):
     def get_urdf_path(cls) -> Path:
         return get_panda_urdf_path()
 
+    def set_gripper_joints(self, angles: np.ndarray) -> None:
+        for joint_name, angle in zip(["panda_finger_joint1", "panda_finger_joint2"], angles):
+            self.robot_model.__dict__[joint_name].joint_angle(angle)
+
+    def get_gripper_joints(self) -> np.ndarray:
+        angles = []
+        for joint_name in ["panda_finger_joint1", "panda_finger_joint2"]:
+            joint = self.robot_model.__dict__[joint_name]
+            angles.append(joint.joint_angle())
+        return np.array(angles)
+
 
 class StickPandaModelBase(PandaModelBase):
     class StickModel(Enum):
@@ -200,6 +211,13 @@ class PybulletRobotInterface:
             joint_id = self.joint_table[name]
             pb.resetJointState(self.robot_id, joint_id, joint.joint_angle())
 
+    def reset_gripper_pos(self, robot: PandaModelBase):
+        gripper_names = ["panda_finger_joint1", "panda_finger_joint2"]
+        for name in gripper_names:
+            joint_id = self.joint_table[name]
+            joint = robot.robot_model.__dict__[name]
+            pb.resetJointState(self.robot_id, joint_id, joint.joint_angle())
+
     def wait_interpolation(
         self, sleep: float = 0.0, callback: Optional[Callable] = None, vel_threshold: float = 0.05
     ) -> None:
@@ -229,6 +247,15 @@ class PybulletRobotInterface:
 
         angle_list = []
         for name in joint_names:
+            joint_id = self.joint_table[name]
+            pos, _, _, _ = pb.getJointState(self.robot_id, joint_id)
+            angle_list.append(pos)
+        return np.array(angle_list)
+
+    def get_gripper_angles(self) -> np.ndarray:
+        gripper_joint_names = ["panda_finger_joint1", "panda_finger_joint2"]
+        angle_list = []
+        for name in gripper_joint_names:
             joint_id = self.joint_table[name]
             pos, _, _, _ = pb.getJointState(self.robot_id, joint_id)
             angle_list.append(pos)
