@@ -42,14 +42,14 @@ class Commander:
         self.robot.set_joint_angles(list(self._init_angle_vector))
         self.ri.reset_angles(self.robot)
 
-    def send_command(self, robot_model: PandaModelBase):
+    def send_command(self, robot_model: PandaModelBase, n_command_split: int = 3):
+        # n_command_split to avoid instability due to sudden move of end effector
         joint_angles = robot_model.get_joint_angles()
         if isinstance(robot_model, GripperPandaModel):
             gripper_angles = robot_model.get_gripper_joints()
         else:
             gripper_angles = None
 
-        n_command_split = 3  # to avoid instability due to sudden move of end effector
         angles_now = self.ri.get_joint_angles()
         angles_diff = (joint_angles - angles_now) / float(n_command_split)
 

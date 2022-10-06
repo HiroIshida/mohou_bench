@@ -1,11 +1,20 @@
 import copy
-import time
 from dataclasses import dataclass
 from typing import Dict, Tuple
 
 import numpy as np
 import pybullet as pb
 import pybullet_data
+import tqdm
+from mohou.file import get_project_path
+from mohou.types import (
+    AngleVector,
+    ElementDict,
+    EpisodeBundle,
+    EpisodeData,
+    MetaData,
+    RGBImage,
+)
 from skrobot.coordinates import Coordinates
 from skrobot.coordinates.math import (
     quaternion2matrix,
@@ -15,6 +24,7 @@ from skrobot.coordinates.math import (
 )
 
 from mohou_bench.asset import get_fryingpan_urdf_path
+from mohou_bench.camera import Camera
 from mohou_bench.commander import Commander
 from mohou_bench.pybullet_utils import create_debug_axis
 from mohou_bench.robot import GripperPandaModel
@@ -64,7 +74,7 @@ class World:
 
         for key in self.id_table.keys():
             c = self.configuration_table[key]
-            point = (c[0], c[1], 0.0)
+            point = (c[0], c[1], 0.03)
             rpy = (c[2], 0.0, 0.0)
             self.set_pose(key, point, rpy)  # type: ignore
 
@@ -76,7 +86,7 @@ class World:
         self.configuration_table["pan"] = c
 
 
-def oracle_rollout(commander: Commander, world: World):
+def oracle_rollout(commander: Commander, world: World, camera: Camera) -> EpisodeData:
     robot_model = copy.deepcopy(commander.robot)
 
     av_init = robot_model.get_joint_angles()
@@ -103,28 +113,50 @@ def oracle_rollout(commander: Commander, world: World):
     width_grasp = (av_grasp - av_pre_grasp) / (n_point_grasp - 1)  # type: ignore
     av_list.extend([av_pre_grasp + width_grasp * i for i in range(n_point_grasp)])
 
+    edict_list = []
+    n_command_split = 3
     for av in av_list:
         robot_model.set_joint_angles(av)
-        commander.send_command(robot_model)
-        time.sleep(0.01)
+        commander.send_command(robot_model, n_command_split=n_command_split)
+        mohou_av = AngleVector(av)
+        mohou_rgb = RGBImage(camera.render())
+        edict = ElementDict([mohou_av, mohou_rgb])
+        edict_list.append(edict)
+    metadata = MetaData(
+        {"n_command_split": n_command_split, "step_length": commander.default_step_length}
+    )
+    episode = EpisodeData.from_edict_list(edict_list, metadata=metadata)
+    return episode
 
 
-def reset(commander: Commander, world: World):
+def reset(commander: Commander, world: World, randomize: bool = False):
     commander.reset()
-    robot_model: GripperPandaModel = copy.deepcopy(commander.robot)
+    robot_model: GripperPandaModel = copy.deepcopy(commander.robot)  # type: ignore
     robot_model.move_end_pos([0.05, 0.0, 0.2], wrt="world")
-    robot_model.set_gripper_joints([0.04, 0.04])
+    robot_model.set_gripper_joints(np.array([0.04, 0.04]))
     commander.send_command(robot_model)
-    world.reset()
+    world.reset(randomize=randomize)
 
 
-CLIENT = pb.connect(pb.GUI)
-pb.setAdditionalSearchPath(pybullet_data.getDataPath())  # used by loadURDF
-pb.configureDebugVisualizer(pb.COV_ENABLE_GUI, 0)
-pb.configureDebugVisualizer(pb.COV_ENABLE_SHADOWS, 0)
-pb.setGravity(0, 0, -10)
-com = Commander.create(robot_type=GripperPandaModel)
-world = World.create()
+if __name__ == "__main__":
+    project_name = "reach_pan"
+    project_path = get_project_path(project_name)
+    project_path.mkdir(exist_ok=True)
 
-reset(com, world)
-oracle_rollout(com, world)
+    CLIENT = pb.connect(pb.DIRECT)
+    pb.setAdditionalSearchPath(pybullet_data.getDataPath())  # used by loadURDF
+    pb.configureDebugVisualizer(pb.COV_ENABLE_GUI, 0)
+    pb.configureDebugVisualizer(pb.COV_ENABLE_SHADOWS, 0)
+    pb.setGravity(0, 0, -10)
+    com = Commander.create(robot_type=GripperPandaModel)
+    world = World.create()
+
+    camera = Camera.create(Camera.CameraPosition.rightfront)
+    episode_list = []
+    for _ in tqdm.tqdm(range(10)):
+        reset(com, world, randomize=True)
+        episode = oracle_rollout(com, world, camera)
+        episode_list.append(episode)
+    bundle = EpisodeBundle.from_episodes(episode_list)
+    bundle.dump(project_path, exist_ok=True)
+    bundle.plot_vector_histories(AngleVector, project_path)
