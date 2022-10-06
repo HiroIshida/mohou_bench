@@ -9,6 +9,19 @@ from skrobot.coordinates.math import rotation_matrix_from_axis
 
 
 @dataclass
+class RenderResult:
+    width: int
+    height: int
+    rgba: np.ndarray
+    depth: np.ndarray
+    segmentation: np.ndarray
+
+    @property
+    def rgb(self) -> np.ndarray:
+        return self.rgba[:, :, :3]
+
+
+@dataclass
 class Camera:
     """Camera
     Most of the functions in this class
@@ -57,18 +70,17 @@ class Camera:
                 )
             )
 
-    def render(self) -> np.ndarray:
+    def render(self) -> RenderResult:
         target = self.coords.worldpos() + self.coords.rotate_vector([0, 0, 1.0])
         up = self.coords.rotate_vector([0, -1.0, 0])
         vm = pb.computeViewMatrix(self.coords.worldpos(), target, up)
         fov, aspect, near, far = 45.0, 1.0, 0.01, 5.1
         pm = pb.computeProjectionMatrixFOV(fov, aspect, near, far)
-        _, _, rgba, depth, _ = pb.getCameraImage(
+        args = pb.getCameraImage(
             self.resolution,
             self.resolution,
             vm,
             pm,
             renderer=pb.ER_TINY_RENDERER,
         )
-        rgb = rgba[:, :, :3]
-        return rgb
+        return RenderResult(*args)

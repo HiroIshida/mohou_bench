@@ -4,7 +4,7 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Type
 
 import numpy as np
 import pybullet as pb
@@ -30,6 +30,7 @@ from mohou_bench.robot import (
     BoxStickPandaModel,
     CylinderStickPandaModel,
     LboxStickPandaModel,
+    StickPandaModelBase,
 )
 from mohou_bench.teleop import PS4Button, TeleoperationCommander
 from mohou_bench.utils import PropagatorLike, get_skrobot_coords
@@ -291,7 +292,7 @@ if __name__ == "__main__":
     use_bunsetsu: bool = args.bunsetsu
     world_mode_str: str = args.world
 
-    robot_type = RobotType[stick_model].value
+    robot_type: Type[StickPandaModelBase] = RobotType[stick_model].value
     mode = Mode[mode_str]
     project_name = "push_{}stick_{}cylinder".format(stick_model, n_cylinder)
     if use_single_color:
@@ -321,6 +322,7 @@ if __name__ == "__main__":
         else:
             prop = LSTMPropagator.create_default(project_path)
         raw_com = Commander.create(robot_type=robot_type)
+        robot_model = robot_type()
 
         success_count = 0
         episode_list = []
@@ -332,14 +334,16 @@ if __name__ == "__main__":
             edict_list = []
             for _ in range(150):
                 av = AngleVector(raw_com.ri.get_joint_angles())
-                rgb = RGBImage(world.camera.render())
+                render_result = world.camera.render()
+                rgb = RGBImage(render_result.rgb)
                 edict = ElementDict([av, rgb])
                 edict_list.append(edict)
                 prop.feed(edict)
 
                 edict_next = prop.predict(1)[0]
                 av_next = edict_next[AngleVector]
-                raw_com.send_command(av_next.numpy())
+                robot_model.set_joint_angles(list(av_next.numpy()))
+                raw_com.send_command(robot_model)
 
             # post trial
             is_successful = world.is_successful()
@@ -367,7 +371,8 @@ if __name__ == "__main__":
 
         def post_command_hook(com: TeleoperationCommander):
             av = AngleVector(com.robot.get_joint_angles())
-            rgb = RGBImage(world.camera.render())
+            render_result = world.camera.render()
+            rgb = RGBImage(render_result.rgba[:, :, :3])
             edict_list.append(ElementDict([av, rgb]))
 
         def reset_callback(save_episode: bool = True):

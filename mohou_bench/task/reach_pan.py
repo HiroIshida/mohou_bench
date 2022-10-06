@@ -117,9 +117,11 @@ def oracle_rollout(commander: Commander, world: World, camera: Camera) -> Episod
     n_command_split = 3
     for av in av_list:
         robot_model.set_joint_angles(av)
+        render_result = camera.render()
         commander.send_command(robot_model, n_command_split=n_command_split)
         mohou_av = AngleVector(av)
-        mohou_rgb = RGBImage(camera.render())
+
+        mohou_rgb = RGBImage(render_result.rgb)
         edict = ElementDict([mohou_av, mohou_rgb])
         edict_list.append(edict)
     metadata = MetaData(
@@ -153,7 +155,7 @@ if __name__ == "__main__":
 
     camera = Camera.create(Camera.CameraPosition.rightfront)
     episode_list = []
-    for _ in tqdm.tqdm(range(10)):
+    for _ in tqdm.tqdm(range(45)):
         reset(com, world, randomize=True)
         episode = oracle_rollout(com, world, camera)
         episode_list.append(episode)
