@@ -13,7 +13,7 @@ def get_cache_path() -> Path:
 
 def get_fryingpan_urdf_path() -> Path:
 
-    url = "https://drive.google.com/uc?id=13dkCihC38S-wqf5SheiTsQQnLNpXZBwn"
+    url = "https://drive.google.com/uc?id=1wtKEeOqKMg8h36LLqP64kzsgKUbtnDkA"
 
     urdf_path = get_cache_path() / "Chefmate_8_Frypan" / "object.urdf"
 
