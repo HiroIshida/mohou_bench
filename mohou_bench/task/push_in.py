@@ -4,7 +4,7 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Tuple, Type
+from typing import Dict, List, Tuple
 
 import numpy as np
 import pybullet as pb
@@ -25,17 +25,11 @@ from skrobot.coordinates.math import rpy2quaternion, wxyz2xyzw
 
 from mohou_bench.camera import Camera
 from mohou_bench.commander import Commander
-from mohou_bench.pybullet_utils import (
-    BoxConfig,
-    CylinderConfig,
-    PrimitiveConfig,
-    PybulletColor,
-)
+from mohou_bench.pybullet_utils import BoxConfig, PrimitiveConfig, PybulletColor
 from mohou_bench.robot import (
     BoxStickPandaModel,
     CylinderStickPandaModel,
     LboxStickPandaModel,
-    StickPandaModelBase,
 )
 from mohou_bench.teleop import PS4Button, TeleoperationCommander
 from mohou_bench.utils import PropagatorLike, get_skrobot_coords
@@ -136,7 +130,8 @@ class WorldBase(ABC):
         color_table = {}
         for idx, name in enumerate(center_dict.keys()):
             color = color_list[idx % len(color_list)]
-            conf = CylinderConfig(radius=radius, height=0.02, rgba=color)
+            # conf = CylinderConfig(radius=radius, height=0.02, rgba=color)
+            conf = BoxConfig([0.14, 0.04, 0.04], rgba=color)
             center = center_dict[name]
             object_id = conf.to_pybullet_object(pos=list(center))
             id_table[name] = object_id
@@ -198,6 +193,25 @@ class SingleGoalWorld(WorldBase):
         return True
 
 
+class SingleNarrowGoalWorld(WorldBase):
+    goal_region: GoalRegion
+    camera: Camera
+
+    def _post_init_hook(self) -> None:
+        goal_region = GoalRegion(0.07, 0.15, np.array([0.7, -0.2]))
+        goal_region.create()
+        self.goal_region = goal_region
+        self.camera = Camera.create(Camera.CameraPosition.frontclose)
+
+    def is_successful(self) -> bool:
+        for body_id in self.id_table.values():
+            co = get_skrobot_coords(body_id)
+            pos = co.translation[:2]
+            if not self.goal_region.is_inside(pos):
+                return False
+        return True
+
+
 class DualGoalWorld(WorldBase):
     goal_region_left: GoalRegion
     goal_region_right: GoalRegion
@@ -210,7 +224,7 @@ class DualGoalWorld(WorldBase):
         goal_region_right.create()
         self.goal_region_left = goal_region_left
         self.goal_region_right = goal_region_right
-        self.camera = Camera.create(Camera.CameraPosition.rightfront)
+        self.camera = Camera.create(Camera.CameraPosition.frontclose)
 
     def is_successful(self) -> bool:
         for key in self.id_table.keys():
@@ -250,7 +264,14 @@ class Mode(Enum):
 
 class WorldMode(Enum):
     single = SingleGoalWorld
+    single_narrow = SingleNarrowGoalWorld
     dual = DualGoalWorld
+
+
+class RobotType(Enum):
+    box = BoxStickPandaModel
+    lbox = LboxStickPandaModel
+    cylinder = CylinderStickPandaModel
 
 
 if __name__ == "__main__":
@@ -270,16 +291,7 @@ if __name__ == "__main__":
     use_bunsetsu: bool = args.bunsetsu
     world_mode_str: str = args.world
 
-    robot_type: Type[StickPandaModelBase]
-    if stick_model == "box":
-        robot_type = BoxStickPandaModel
-    elif stick_model == "cylinder":
-        robot_type = CylinderStickPandaModel
-    elif stick_model == "lbox":
-        robot_type = LboxStickPandaModel
-    else:
-        assert False
-
+    robot_type = RobotType[stick_model].value
     mode = Mode[mode_str]
     project_name = "push_{}stick_{}cylinder".format(stick_model, n_cylinder)
     if use_single_color:
@@ -304,7 +316,7 @@ if __name__ == "__main__":
     if mode == Mode.test:
         prop: PropagatorLike
         if use_bunsetsu:
-            sp = get_segmentation_path(project_path, "arhmm2")
+            sp = get_segmentation_path(project_path, "arhmm3")
             prop = SequentialPropagator.load(sp)
         else:
             prop = LSTMPropagator.create_default(project_path)
@@ -312,13 +324,13 @@ if __name__ == "__main__":
 
         success_count = 0
         episode_list = []
-        for _ in range(100):
+        for _ in range(60):
             prop.reset()
             world.reset(randomize=True)
             raw_com.reset()
 
             edict_list = []
-            for _ in range(250):
+            for _ in range(150):
                 av = AngleVector(raw_com.ri.get_joint_angles())
                 rgb = RGBImage(world.camera.render())
                 edict = ElementDict([av, rgb])
