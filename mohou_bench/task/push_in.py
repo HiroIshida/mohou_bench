@@ -131,7 +131,7 @@ class WorldBase(ABC):
         for idx, name in enumerate(center_dict.keys()):
             color = color_list[idx % len(color_list)]
             # conf = CylinderConfig(radius=radius, height=0.02, rgba=color)
-            conf = BoxConfig([0.14, 0.04, 0.04], rgba=color)
+            conf = BoxConfig((0.14, 0.04, 0.04), rgba=color)
             center = center_dict[name]
             object_id = conf.to_pybullet_object(pos=list(center))
             id_table[name] = object_id
