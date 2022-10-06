@@ -104,7 +104,8 @@ def oracle_rollout(commander: Commander, world: World):
     av_list.extend([av_pre_grasp + width_grasp * i for i in range(n_point_grasp)])
 
     for av in av_list:
-        commander.send_command(av)
+        robot_model.set_joint_angles(av)
+        commander.send_command(robot_model)
         time.sleep(0.01)
 
 
@@ -112,7 +113,7 @@ def reset(commander: Commander, world: World):
     commander.reset()
     robot_model = copy.deepcopy(commander.robot)
     robot_model.move_end_pos([0.05, 0.0, 0.2], wrt="world")
-    commander.send_command(robot_model.get_joint_angles())
+    commander.send_command(robot_model)
     world.reset()
 
 

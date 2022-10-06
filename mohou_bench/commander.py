@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Optional, Type
 
 import numpy as np
@@ -8,22 +9,18 @@ from mohou_bench.robot import (
     CylinderStickPandaModel,
     PandaModelBase,
     PybulletRobotInterface,
-    StickPandaModelBase,
 )
 
 
+@dataclass
 class Commander:
     robot: PandaModelBase
     ri: PybulletRobotInterface
     default_step_length: int = 50
     _init_angle_vector: Optional[np.ndarray] = None
 
-    def __init__(self, robot: StickPandaModelBase, ri: PybulletRobotInterface):
-        self.robot = robot
-        self.ri = ri
-
     @classmethod
-    def create(cls, robot_type: Type[StickPandaModelBase] = CylinderStickPandaModel) -> "Commander":
+    def create(cls, robot_type: Type[PandaModelBase] = CylinderStickPandaModel) -> "Commander":
         robot = robot_type()
         ri = PybulletRobotInterface(robot)
         return cls(robot, ri)
@@ -44,7 +41,8 @@ class Commander:
         self.robot.set_joint_angles(list(self._init_angle_vector))
         self.ri.reset_angles(self.robot)
 
-    def send_command(self, joint_angles: np.ndarray):
+    def send_command(self, robot_model: PandaModelBase):
+        joint_angles = robot_model.get_joint_angles()
         n_command_split = 3  # to avoid instability due to sudden move of end effector
         angles_now = self.ri.get_joint_angles()
         angles_diff = (joint_angles - angles_now) / float(n_command_split)

@@ -9,7 +9,12 @@ import pygame
 from pynput.keyboard import Key
 
 from mohou_bench.commander import Commander
-from mohou_bench.robot import CylinderStickPandaModel, IKFailError, StickPandaModelBase
+from mohou_bench.robot import (
+    CylinderStickPandaModel,
+    IKFailError,
+    PandaModelBase,
+    StickPandaModelBase,
+)
 
 
 class PS4Button(Enum):
@@ -117,7 +122,7 @@ class TeleoperationCommander:
         return activated_keys, command_2d
 
     @property
-    def robot(self) -> StickPandaModelBase:
+    def robot(self) -> PandaModelBase:
         return self.commander.robot
 
     def reset(self) -> None:
@@ -140,8 +145,7 @@ class TeleoperationCommander:
                 command_3d = np.array([command_2d[0], command_2d[1], 0.0])
                 try:
                     self.robot.move_end_pos(command_3d, wrt="world")
-                    joint_angles_next = self.robot.get_joint_angles()
-                    self.commander.send_command(joint_angles_next)
+                    self.commander.send_command(self.robot)
 
                     if self.post_command_hook is not None:
                         self.post_command_hook(self)
