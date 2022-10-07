@@ -65,6 +65,7 @@ class World:
 
         if configuration is not None:
             assert not randomize
+            self.configuration_table["pan"] = configuration
 
         if randomize:
             self.randomize()
