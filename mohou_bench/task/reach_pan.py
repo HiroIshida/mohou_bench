@@ -30,11 +30,11 @@ class World:
 
     @classmethod
     def create(cls):
-        pb.loadURDF("plane.urdf")
+        plane_id = pb.loadURDF("plane.urdf")
 
         frypan_path_str = get_fryingpan_urdf_path()
         pan_id = pb.loadURDF(str(frypan_path_str))
-        id_table = {"pan": pan_id}
+        id_table = {"pan": pan_id, "plane": plane_id}
 
         center_table = {"pan": np.array([0.5, 0.0, np.pi * 0.5])}
         return cls(id_table, center_table)
@@ -65,17 +65,16 @@ class World:
         if randomize:
             self.randomize()
 
-        for key in self.id_table.keys():
-            c = self.configuration_table[key]
-            point = (c[0], c[1], 0.03)
-            rpy = (c[2], 0.0, 0.0)
-            self.set_pose(key, point, rpy)  # type: ignore
+        key = "pan"
+        c = self.configuration_table[key]
+        point = (c[0], c[1], 0.03)
+        rpy = (c[2], 0.0, 0.0)
+        self.set_pose(key, point, rpy)  # type: ignore
 
     def randomize(self) -> None:
         c_nominal = np.array([0.5, 0.0, np.pi * 0.5])
         width = np.array([0.2, 0.2, 0.6])
         c = c_nominal - width * 0.5 + np.random.rand(3) * width
-        print(c)
         self.configuration_table["pan"] = c
 
 

@@ -24,9 +24,11 @@ class RenderResult:
 
     @property
     def mohou_segmentation(self) -> GrayImage:
-        assert np.max(self.segmentation) < 256
-        assert np.min(self.segmentation) > -1
-        segm = np.expand_dims(copy.deepcopy(self.segmentation), axis=2).astype(np.uint8)
+        # in pybullet index -1 indicates the background
+        assert np.max(self.segmentation) < 255
+        assert np.min(self.segmentation) > -2
+        segm_uint8 = (copy.deepcopy(self.segmentation) + 1).astype(np.uint8)
+        segm = np.expand_dims(segm_uint8, axis=2)
         return GrayImage(segm)
 
 
