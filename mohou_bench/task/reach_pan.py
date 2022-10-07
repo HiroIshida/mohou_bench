@@ -191,6 +191,7 @@ if __name__ == "__main__":
         episode = oracle_rollout(com, world, camera)
         untouch_episode_list.append(episode)
 
-    bundle = EpisodeBundle(episode_list, untouch_episode_list, MetaData({}))
+    meta = MetaData({"id_table": world.id_table})
+    bundle = EpisodeBundle(episode_list, untouch_episode_list, meta)
     bundle.dump(project_path, exist_ok=True)
     bundle.plot_vector_histories(AngleVector, project_path)
