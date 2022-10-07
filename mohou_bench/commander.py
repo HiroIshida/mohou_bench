@@ -46,7 +46,7 @@ class Commander:
         # n_command_split to avoid instability due to sudden move of end effector
         joint_angles = robot_model.get_joint_angles()
         if isinstance(robot_model, GripperPandaModel):
-            gripper_angles = robot_model.get_gripper_joints()
+            gripper_angles: Optional[np.ndarray] = robot_model.get_gripper_joints()
         else:
             gripper_angles = None
 
