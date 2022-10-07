@@ -1,6 +1,6 @@
 import copy
 from dataclasses import dataclass
-from typing import Dict, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pybullet as pb
@@ -61,7 +61,11 @@ class World:
         mat = quaternion2matrix(xyzw2wxyz(quat))
         return Coordinates(trans, mat)
 
-    def reset(self, randomize: bool = False):
+    def reset(self, randomize: bool = False, configuration: Optional[np.ndarray] = None):
+
+        if configuration is not None:
+            assert not randomize
+
         if randomize:
             self.randomize()
 
@@ -122,13 +126,42 @@ def oracle_rollout(commander: Commander, world: World, camera: Camera) -> Episod
     return episode
 
 
-def reset(commander: Commander, world: World, randomize: bool = False):
+def reset(
+    commander: Commander,
+    world: World,
+    randomize: bool = False,
+    configuration: Optional[np.ndarray] = None,
+):
     commander.reset()
     robot_model: GripperPandaModel = copy.deepcopy(commander.robot)  # type: ignore
     robot_model.move_end_pos([0.05, 0.0, 0.2], wrt="world")
     robot_model.set_gripper_joints(np.array([0.04, 0.04]))
     commander.send_command(robot_model)
-    world.reset(randomize=randomize)
+    world.reset(randomize=randomize, configuration=configuration)
+
+
+def get_regular_grid_coords() -> List[np.ndarray]:
+    def gen(n_dim: int, n_split: int) -> np.ndarray:
+        assert n_dim > 0
+        arr = np.expand_dims(np.linspace(0, 1, n_split), axis=0).T
+        for i in range(n_dim - 1):
+            row, col = arr.shape
+            partial_list = []
+            for val in np.linspace(0, 1, n_split):
+                partial = np.ones((row, col + 1)) * val
+                partial[:, 1:] = arr
+                partial_list.append(partial)
+            arr = np.vstack(partial_list)
+        return arr
+
+    center = [0.5, 0.0, np.pi * 0.5]
+    width = np.array([0.2, 0.2, 0.6])
+    b_min = center - 0.5 * width
+
+    coords_list = []
+    for index_like in gen(3, 3):
+        coords_list.append(b_min + width * index_like)
+    return coords_list
 
 
 if __name__ == "__main__":
@@ -146,10 +179,17 @@ if __name__ == "__main__":
 
     camera = Camera.create(Camera.CameraPosition.rightfront, n_pixel=112)
     episode_list = []
-    for _ in tqdm.tqdm(range(45)):
-        reset(com, world, randomize=True)
+    for coords in tqdm.tqdm(get_regular_grid_coords()):
+        reset(com, world, randomize=False, configuration=coords)
         episode = oracle_rollout(com, world, camera)
         episode_list.append(episode)
-    bundle = EpisodeBundle.from_episodes(episode_list)
+
+    untouch_episode_list = []
+    for _ in tqdm.tqdm(range(10)):
+        reset(com, world, randomize=True)
+        episode = oracle_rollout(com, world, camera)
+        untouch_episode_list.append(episode)
+
+    bundle = EpisodeBundle(episode_list, untouch_episode_list, MetaData({}))
     bundle.dump(project_path, exist_ok=True)
     bundle.plot_vector_histories(AngleVector, project_path)
