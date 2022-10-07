@@ -145,7 +145,7 @@ if __name__ == "__main__":
     com = Commander.create(robot_type=GripperPandaModel)
     world = World.create()
 
-    camera = Camera.create(Camera.CameraPosition.rightfront)
+    camera = Camera.create(Camera.CameraPosition.rightfront, n_pixel=112)
     episode_list = []
     for _ in tqdm.tqdm(range(45)):
         reset(com, world, randomize=True)
