@@ -13,14 +13,7 @@ from bunsetsu.file import get_segmentation_path
 from bunsetsu.propagator import SequentialPropagator
 from mohou.file import get_project_path
 from mohou.propagator import LSTMPropagator
-from mohou.types import (
-    AngleVector,
-    ElementDict,
-    EpisodeBundle,
-    EpisodeData,
-    MetaData,
-    RGBImage,
-)
+from mohou.types import AngleVector, ElementDict, EpisodeBundle, EpisodeData, MetaData
 from skrobot.coordinates.math import rpy2quaternion, wxyz2xyzw
 
 from mohou_bench.camera import Camera
@@ -110,6 +103,7 @@ class WorldBase(ABC):
     center_table: Dict[str, np.ndarray]
     color_table: Dict[str, PybulletColor]
     randomizer: CylinderPositionRandomizer
+    camera: Camera
 
     def __init__(
         self, n_cylinder: int, keep_distance: bool = False, use_single_color: bool = False
@@ -312,7 +306,7 @@ if __name__ == "__main__":
     pb.setAdditionalSearchPath(pybullet_data.getDataPath())  # used by loadURDF
     pb.loadURDF("plane.urdf")
     world_type = WorldMode[world_mode_str].value
-    world = world_type(n_cylinder, keep_distance=True, use_single_color=use_single_color)
+    world: WorldBase = world_type(n_cylinder, keep_distance=True, use_single_color=use_single_color)
 
     if mode == Mode.test:
         prop: PropagatorLike
@@ -335,8 +329,7 @@ if __name__ == "__main__":
             for _ in range(150):
                 av = AngleVector(raw_com.ri.get_joint_angles())
                 render_result = world.camera.render()
-                rgb = RGBImage(render_result.rgb)
-                edict = ElementDict([av, rgb])
+                edict = ElementDict([av, render_result.mohou_rgb])
                 edict_list.append(edict)
                 prop.feed(edict)
 
@@ -372,8 +365,7 @@ if __name__ == "__main__":
         def post_command_hook(com: TeleoperationCommander):
             av = AngleVector(com.robot.get_joint_angles())
             render_result = world.camera.render()
-            rgb = RGBImage(render_result.rgba[:, :, :3])
-            edict_list.append(ElementDict([av, rgb]))
+            edict_list.append(ElementDict([av, render_result.mohou_rgb]))
 
         def reset_callback(save_episode: bool = True):
             global edict_list

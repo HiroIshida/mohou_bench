@@ -7,14 +7,7 @@ import pybullet as pb
 import pybullet_data
 import tqdm
 from mohou.file import get_project_path
-from mohou.types import (
-    AngleVector,
-    ElementDict,
-    EpisodeBundle,
-    EpisodeData,
-    MetaData,
-    RGBImage,
-)
+from mohou.types import AngleVector, ElementDict, EpisodeBundle, EpisodeData, MetaData
 from skrobot.coordinates import Coordinates
 from skrobot.coordinates.math import (
     quaternion2matrix,
@@ -120,10 +113,9 @@ def oracle_rollout(commander: Commander, world: World, camera: Camera) -> Episod
         render_result = camera.render()
         commander.send_command(robot_model, n_command_split=n_command_split)
         mohou_av = AngleVector(av)
-
-        mohou_rgb = RGBImage(render_result.rgb)
-        edict = ElementDict([mohou_av, mohou_rgb])
+        edict = ElementDict([mohou_av, render_result.mohou_rgb, render_result.mohou_segmentation])
         edict_list.append(edict)
+
     metadata = MetaData(
         {"n_command_split": n_command_split, "step_length": commander.default_step_length}
     )

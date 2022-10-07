@@ -1,8 +1,10 @@
+import copy
 from dataclasses import dataclass
 from enum import Enum
 
 import numpy as np
 import pybullet as pb
+from mohou.types import GrayImage, RGBImage
 from skrobot.coordinates import Coordinates
 from skrobot.coordinates.geo import orient_coords_to_axis
 from skrobot.coordinates.math import rotation_matrix_from_axis
@@ -17,8 +19,15 @@ class RenderResult:
     segmentation: np.ndarray
 
     @property
-    def rgb(self) -> np.ndarray:
-        return self.rgba[:, :, :3]
+    def mohou_rgb(self) -> RGBImage:
+        return RGBImage(self.rgba[:, :, :3])
+
+    @property
+    def mohou_segmentation(self) -> GrayImage:
+        assert np.max(self.segmentation) < 256
+        assert np.min(self.segmentation) > -1
+        segm = np.expand_dims(copy.deepcopy(self.segmentation), axis=2).astype(np.uint8)
+        return GrayImage(segm)
 
 
 @dataclass
