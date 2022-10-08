@@ -1,11 +1,15 @@
+import argparse
 import copy
+from enum import Enum
 from typing import List, Optional
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pybullet as pb
 import pybullet_data
 import tqdm
 from mohou.file import get_project_path
+from mohou.propagator import LSTMPropagator
 from mohou.types import AngleVector, ElementDict, EpisodeBundle, EpisodeData, MetaData
 
 from mohou_bench.asset import FryingPanObject, PlaneObject
@@ -138,7 +142,18 @@ def get_regular_grid_coords() -> List[np.ndarray]:
     return coords_list
 
 
+class Mode(Enum):
+    dataset = 1
+    oneshot = 2
+
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-mode", type=str, default="dataset", help="mode")
+    args = parser.parse_args()
+    mode_str: str = args.mode
+    mode = Mode[mode_str]
+
     project_name = "reach_pan"
     project_path = get_project_path(project_name)
     project_path.mkdir(exist_ok=True)
@@ -150,20 +165,45 @@ if __name__ == "__main__":
     pb.setGravity(0, 0, -10)
     com = Commander.create(robot_type=GripperPandaModel)
     world = World.create()
+    camera = Camera.create(Camera.CameraPosition.rightfront, n_pixel=112)
 
-    camera = Camera.create(Camera.CameraPosition.rightfront, n_pixel=56)
-    episode_list = []
-    for coords in tqdm.tqdm(get_regular_grid_coords()):
-        reset(com, world, randomize=False, configuration=coords)
-        episode = oracle_rollout(com, world, camera)
-        episode_list.append(episode)
+    if mode == Mode.dataset:
+        episode_list = []
+        for coords in tqdm.tqdm(get_regular_grid_coords()):
+            reset(com, world, randomize=False, configuration=coords)
+            episode = oracle_rollout(com, world, camera)
+            episode_list.append(episode)
 
-    untouch_episode_list = []
-    for _ in tqdm.tqdm(range(10)):
-        reset(com, world, randomize=True)
-        episode = oracle_rollout(com, world, camera)
-        untouch_episode_list.append(episode)
+        untouch_episode_list = []
+        for _ in tqdm.tqdm(range(10)):
+            reset(com, world, randomize=True)
+            episode = oracle_rollout(com, world, camera)
+            untouch_episode_list.append(episode)
 
-    bundle = EpisodeBundle(episode_list, untouch_episode_list, MetaData({}))
-    bundle.dump(project_path, exist_ok=True)
-    bundle.plot_vector_histories(AngleVector, project_path)
+        bundle = EpisodeBundle(episode_list, untouch_episode_list, MetaData({}))
+        bundle.dump(project_path, exist_ok=True)
+        bundle.plot_vector_histories(AngleVector, project_path)
+    elif mode == Mode.oneshot:
+        propagator = LSTMPropagator.create_default(project_path)
+        assert not propagator.require_static_context
+
+        np.random.seed(12345678)
+        for i in tqdm.tqdm(range(10)):
+            propagator.reset()
+            reset(com, world, randomize=True)
+
+            render_result = camera.render()
+            rgb = render_result.mohou_rgb
+            av = AngleVector(com.robot.get_joint_angles())
+            ed = ElementDict([rgb, av])
+            propagator.feed(ed)
+            pred = propagator.predict(100, 0.9)
+
+            av_pred = pred[-1][AngleVector]
+            com.robot.set_joint_angles(list(av_pred.numpy()))
+            com.send_command(com.robot)
+
+            render_result = camera.render()
+            fig, ax = plt.subplots()
+            ax.imshow(render_result.mohou_rgb.numpy())
+            plt.show()
