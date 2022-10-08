@@ -1,6 +1,5 @@
 import copy
-from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional
 
 import numpy as np
 import pybullet as pb
@@ -8,79 +7,49 @@ import pybullet_data
 import tqdm
 from mohou.file import get_project_path
 from mohou.types import AngleVector, ElementDict, EpisodeBundle, EpisodeData, MetaData
-from skrobot.coordinates import Coordinates
-from skrobot.coordinates.math import (
-    quaternion2matrix,
-    rpy2quaternion,
-    wxyz2xyzw,
-    xyzw2wxyz,
-)
 
-from mohou_bench.asset import get_fryingpan_urdf_path
+from mohou_bench.asset import FryingPanObject, PlaneObject
 from mohou_bench.camera import Camera
 from mohou_bench.commander import Commander
 from mohou_bench.pybullet_utils import create_debug_axis
 from mohou_bench.robot import GripperPandaModel
+from mohou_bench.task_base import Task
 
 
-@dataclass
-class World:
-    id_table: Dict[str, int]
-    configuration_table: Dict[str, np.ndarray]
-
+class World(Task):
     @classmethod
     def create(cls):
-        plane_id = pb.loadURDF("plane.urdf")
+        object_list = []
 
-        frypan_path_str = get_fryingpan_urdf_path()
-        pan_id = pb.loadURDF(str(frypan_path_str))
-        id_table = {"pan": pan_id, "plane": plane_id}
+        def pan_randomizer(pose_init: np.ndarray) -> np.ndarray:
+            width = np.array([0.2, 0.2, 0.6])
+            diff = -width * 0.5 + np.random.rand(3) * width
+            pose_new = copy.deepcopy(pose_init)
+            pose_new[0] += diff[0]
+            pose_new[1] += diff[1]
+            pose_new[3] += diff[2]
+            return pose_new
 
-        center_table = {"pan": np.array([0.5, 0.0, np.pi * 0.5])}
-        return cls(id_table, center_table)
-
-    def set_pose(
-        self,
-        body_name: str,
-        point: Tuple[float, float, float],
-        rpy: Tuple[float, float, float] = (0, 0, 0),
-    ):
-        body_id = self.id_table[body_name]
-        q = rpy2quaternion(rpy)
-        pb.resetBasePositionAndOrientation(body_id, point, wxyz2xyzw(q))
-        pb.resetBaseVelocity(
-            body_id,
-            linearVelocity=(0.0, 0.0, 0.0),
-            angularVelocity=(0.0, 0.0, 0.0),
+        object_list.append(
+            FryingPanObject.load(
+                "pan", np.array([0.5, 0.0, 0.03, np.pi * 0.5, 0.0, 0.0]), randomizer=pan_randomizer
+            )
         )
+        object_list.append(PlaneObject.load())
+        return cls(object_list)
 
-    def get_skrobot_coords(self, body_name: str) -> Coordinates:
-        # NOTE quat is xyzw order
-        body_id = self.id_table[body_name]
-        trans, quat = pb.getBasePositionAndOrientation(body_id)
-        mat = quaternion2matrix(xyzw2wxyz(quat))
-        return Coordinates(trans, mat)
-
-    def reset(self, randomize: bool = False, configuration: Optional[np.ndarray] = None):
-
-        if configuration is not None:
-            assert not randomize
-            self.configuration_table["pan"] = configuration
-
+    def reset(self, randomize: bool = False):
         if randomize:
-            self.randomize()
+            for obj in self.object_table.values():
+                obj.randomize_pose()
+        self.update_world()
 
-        key = "pan"
-        c = self.configuration_table[key]
-        point = (c[0], c[1], 0.03)
-        rpy = (c[2], 0.0, 0.0)
-        self.set_pose(key, point, rpy)  # type: ignore
-
-    def randomize(self) -> None:
-        c_nominal = np.array([0.5, 0.0, np.pi * 0.5])
-        width = np.array([0.2, 0.2, 0.6])
-        c = c_nominal - width * 0.5 + np.random.rand(3) * width
-        self.configuration_table["pan"] = c
+    def set_configuration(self, vec: np.ndarray) -> None:
+        assert len(vec) == 3
+        diff = np.array([vec[0], vec[1], 0.0, vec[2], 0.0, 0.0])
+        pose_new = self.object_table["pan"].init_pose + diff
+        self.object_table["pan"].pose = pose_new
+        self.update_world()
 
 
 def oracle_rollout(commander: Commander, world: World, camera: Camera) -> EpisodeData:
@@ -117,7 +86,8 @@ def oracle_rollout(commander: Commander, world: World, camera: Camera) -> Episod
         render_result = camera.render()
         commander.send_command(robot_model, n_command_split=n_command_split)
         mohou_av = AngleVector(av)
-        edict = ElementDict([mohou_av, render_result.mohou_rgb, render_result.mohou_segmentation])
+        # edict = ElementDict([mohou_av, render_result.mohou_rgb, render_result.mohou_segmentation])
+        edict = ElementDict([mohou_av, render_result.mohou_rgb])
         edict_list.append(edict)
 
     metadata = MetaData(
@@ -138,7 +108,10 @@ def reset(
     robot_model.move_end_pos([0.05, 0.0, 0.2], wrt="world")
     robot_model.set_gripper_joints(np.array([0.04, 0.04]))
     commander.send_command(robot_model)
-    world.reset(randomize=randomize, configuration=configuration)
+    if configuration is None:
+        world.reset(randomize=randomize)
+    else:
+        world.set_configuration(configuration)
 
 
 def get_regular_grid_coords() -> List[np.ndarray]:
@@ -155,7 +128,7 @@ def get_regular_grid_coords() -> List[np.ndarray]:
             arr = np.vstack(partial_list)
         return arr
 
-    center = [0.5, 0.0, np.pi * 0.5]
+    center = np.zeros(3)
     width = np.array([0.2, 0.2, 0.6])
     b_min = center - 0.5 * width
 
@@ -170,7 +143,7 @@ if __name__ == "__main__":
     project_path = get_project_path(project_name)
     project_path.mkdir(exist_ok=True)
 
-    CLIENT = pb.connect(pb.DIRECT)
+    CLIENT = pb.connect(pb.GUI)
     pb.setAdditionalSearchPath(pybullet_data.getDataPath())  # used by loadURDF
     pb.configureDebugVisualizer(pb.COV_ENABLE_GUI, 0)
     pb.configureDebugVisualizer(pb.COV_ENABLE_SHADOWS, 0)
@@ -178,7 +151,7 @@ if __name__ == "__main__":
     com = Commander.create(robot_type=GripperPandaModel)
     world = World.create()
 
-    camera = Camera.create(Camera.CameraPosition.rightfront, n_pixel=112)
+    camera = Camera.create(Camera.CameraPosition.rightfront, n_pixel=56)
     episode_list = []
     for coords in tqdm.tqdm(get_regular_grid_coords()):
         reset(com, world, randomize=False, configuration=coords)
@@ -191,7 +164,6 @@ if __name__ == "__main__":
         episode = oracle_rollout(com, world, camera)
         untouch_episode_list.append(episode)
 
-    meta = MetaData({"id_table": world.id_table})
-    bundle = EpisodeBundle(episode_list, untouch_episode_list, meta)
+    bundle = EpisodeBundle(episode_list, untouch_episode_list, MetaData({}))
     bundle.dump(project_path, exist_ok=True)
     bundle.plot_vector_histories(AngleVector, project_path)

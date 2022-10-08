@@ -1,8 +1,13 @@
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Callable, Optional
 
 import gdown
+import numpy as np
+import pybullet as pb
+import pybullet_data
 
 
 def get_cache_path() -> Path:
@@ -29,3 +34,39 @@ def get_fryingpan_urdf_path() -> Path:
 
     assert urdf_path.exists()
     return urdf_path
+
+
+@dataclass
+class BulletObject:
+    name: str
+    bullet_id: int
+    init_pose: np.ndarray
+    pose: np.ndarray
+    randomizer: Optional[Callable[[np.ndarray, np.ndarray], np.ndarray]]
+
+    def reset_pose(self) -> None:
+        pass
+
+    def randomize_pose(self) -> None:
+        if self.randomizer is not None:
+            self.pose = self.randomizer(self.init_pose)
+
+
+@dataclass
+class PlaneObject(BulletObject):
+    @classmethod
+    def load(cls) -> "PlaneObject":
+        pb.setAdditionalSearchPath(pybullet_data.getDataPath())
+        plane_id = pb.loadURDF("plane.urdf")
+        return cls("plane", plane_id, np.zeros(6), np.zeros(6), None)
+
+
+@dataclass
+class FryingPanObject(BulletObject):
+    @classmethod
+    def load(
+        cls, name: str, pose: np.ndarray, randomizer: Optional[Callable] = None
+    ) -> "FryingPanObject":
+        frypan_path_str = get_fryingpan_urdf_path()
+        pan_id = pb.loadURDF(str(frypan_path_str))
+        return cls(name, pan_id, pose, pose, randomizer)
