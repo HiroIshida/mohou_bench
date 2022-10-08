@@ -2,7 +2,15 @@ from setuptools import setup
 
 setup_requires = []
 
-install_requires = ["gdown", "scikit-robot", "pybullet", "pynput", "pygame", "mohou>=0.5.0"]
+install_requires = [
+    "gdown",
+    "scikit-robot",
+    "pybullet",
+    "pynput",
+    "pygame",
+    "mohou>=0.5.0",
+    "pointscatter",
+]
 
 setup(
     name="mohou_bench",

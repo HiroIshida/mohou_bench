@@ -11,6 +11,7 @@ import tqdm
 from mohou.file import get_project_path
 from mohou.propagator import LSTMPropagator
 from mohou.types import AngleVector, ElementDict, EpisodeBundle, EpisodeData, MetaData
+from pointscatter import create_replusive_attractive_potential, scatter_points
 
 from mohou_bench.asset import BulletObject, FryingPanObject, PlaneObject
 from mohou_bench.camera import Camera
@@ -118,27 +119,16 @@ def reset(
         world.set_configuration(configuration)
 
 
-def get_regular_grid_coords() -> List[np.ndarray]:
-    def gen(n_dim: int, n_split: int) -> np.ndarray:
-        assert n_dim > 0
-        arr = np.expand_dims(np.linspace(0, 1, n_split), axis=0).T
-        for i in range(n_dim - 1):
-            row, col = arr.shape
-            partial_list = []
-            for val in np.linspace(0, 1, n_split):
-                partial = np.ones((row, col + 1)) * val
-                partial[:, 1:] = arr
-                partial_list.append(partial)
-            arr = np.vstack(partial_list)
-        return arr
+def get_covering_points(n_badget: int = 30) -> List[np.ndarray]:
+    result = scatter_points(n_badget, 3, create_replusive_attractive_potential(coef_attractive=1.5))
 
     center = np.zeros(3)
     width = np.array([0.2, 0.2, 0.6])
     b_min = center - 0.5 * width
 
     coords_list = []
-    for index_like in gen(3, 3):
-        coords_list.append(b_min + width * index_like)
+    for p in result.points:
+        coords_list.append(b_min + width * p)
     return coords_list
 
 
@@ -171,7 +161,7 @@ if __name__ == "__main__":
 
     if mode == Mode.dataset:
         episode_list = []
-        for coords in tqdm.tqdm(get_regular_grid_coords()):
+        for coords in tqdm.tqdm(get_covering_points()):
             reset(com, world, randomize=False, configuration=coords)
             episode = oracle_rollout(com, world, camera)
             episode_list.append(episode)
