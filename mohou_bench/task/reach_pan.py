@@ -62,7 +62,7 @@ def oracle_rollout(commander: Commander, world: World, camera: Camera) -> Episod
     av_init = robot_model.get_joint_angles()
 
     co = world.get_skrobot_coords("pan")
-    co.translate([0.15, 0.0, 0.15])
+    co.translate([0.15, 0.01, 0.15])
     co.rotate(np.pi * 0.5, "y")
     co.rotate(np.pi * 1.0, "x")
     create_debug_axis(co)
@@ -70,7 +70,7 @@ def oracle_rollout(commander: Commander, world: World, camera: Camera) -> Episod
     robot_model.solve_ik(co)
     av_pre_grasp = robot_model.get_joint_angles()
 
-    co.translate([0.0, 0.0, -0.12], "world")
+    co.translate([0.0, 0.0, -0.16], "world")
     robot_model.solve_ik(co)
     av_grasp = robot_model.get_joint_angles()
 
@@ -110,7 +110,7 @@ def reset(
     commander.reset()
     robot_model: GripperPandaModel = copy.deepcopy(commander.robot)  # type: ignore
     robot_model.move_end_pos([0.05, 0.0, 0.2], wrt="world")
-    robot_model.set_gripper_joints(np.array([0.04, 0.04]))
+    robot_model.set_gripper_joints(np.array([0.02, 0.02]))
     commander.send_command(robot_model)
     if configuration is None:
         world.reset(randomize=randomize)
@@ -150,15 +150,17 @@ class Mode(Enum):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-mode", type=str, default="dataset", help="mode")
+    parser.add_argument("--gui", action="store_true", help="gui")
     args = parser.parse_args()
     mode_str: str = args.mode
+    use_gui: bool = args.gui
     mode = Mode[mode_str]
 
     project_name = "reach_pan"
     project_path = get_project_path(project_name)
     project_path.mkdir(exist_ok=True)
 
-    CLIENT = pb.connect(pb.GUI)
+    CLIENT = pb.connect(pb.GUI if use_gui else pb.DIRECT)
     pb.setAdditionalSearchPath(pybullet_data.getDataPath())  # used by loadURDF
     pb.configureDebugVisualizer(pb.COV_ENABLE_GUI, 0)
     pb.configureDebugVisualizer(pb.COV_ENABLE_SHADOWS, 0)
