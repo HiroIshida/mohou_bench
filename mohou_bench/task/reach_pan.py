@@ -12,7 +12,7 @@ from mohou.file import get_project_path
 from mohou.propagator import LSTMPropagator
 from mohou.types import AngleVector, ElementDict, EpisodeBundle, EpisodeData, MetaData
 
-from mohou_bench.asset import FryingPanObject, PlaneObject
+from mohou_bench.asset import BulletObject, FryingPanObject, PlaneObject
 from mohou_bench.camera import Camera
 from mohou_bench.commander import Commander
 from mohou_bench.pybullet_utils import create_debug_axis
@@ -23,7 +23,7 @@ from mohou_bench.task_base import Task
 class World(Task):
     @classmethod
     def create(cls):
-        object_list = []
+        object_list: List[BulletObject] = []
 
         def pan_randomizer(pose_init: np.ndarray) -> np.ndarray:
             width = np.array([0.2, 0.2, 0.6])

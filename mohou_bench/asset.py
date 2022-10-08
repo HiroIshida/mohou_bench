@@ -42,7 +42,7 @@ class BulletObject:
     bullet_id: int
     init_pose: np.ndarray
     pose: np.ndarray
-    randomizer: Optional[Callable[[np.ndarray, np.ndarray], np.ndarray]]
+    randomizer: Optional[Callable[[np.ndarray], np.ndarray]]
 
     def reset_pose(self) -> None:
         pass
