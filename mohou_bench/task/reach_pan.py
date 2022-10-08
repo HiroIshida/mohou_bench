@@ -27,7 +27,7 @@ class World(Task):
         object_list: List[BulletObject] = []
 
         def pan_randomizer(pose_init: np.ndarray) -> np.ndarray:
-            width = np.array([0.2, 0.2, 0.6])
+            width = np.array([0.2, 0.2, 0.6]) * 0.8
             diff = -width * 0.5 + np.random.rand(3) * width
             pose_new = copy.deepcopy(pose_init)
             pose_new[0] += diff[0]
@@ -111,7 +111,7 @@ def reset(
     commander.reset()
     robot_model: GripperPandaModel = copy.deepcopy(commander.robot)  # type: ignore
     robot_model.move_end_pos([0.05, 0.0, 0.2], wrt="world")
-    robot_model.set_gripper_joints(np.array([0.02, 0.02]))
+    robot_model.set_gripper_joints(np.array([0.04, 0.04]))
     commander.send_command(robot_model)
     if configuration is None:
         world.reset(randomize=randomize)
@@ -180,7 +180,7 @@ if __name__ == "__main__":
         assert not propagator.require_static_context
 
         np.random.seed(12345678)
-        for i in tqdm.tqdm(range(10)):
+        for i in tqdm.tqdm(range(20)):
             propagator.reset()
             reset(com, world, randomize=True)
 
@@ -188,7 +188,8 @@ if __name__ == "__main__":
             rgb = render_result.mohou_rgb
             av = AngleVector(com.robot.get_joint_angles())
             ed = ElementDict([rgb, av])
-            propagator.feed(ed)
+            for _ in range(3):
+                propagator.feed(ed)
             pred = propagator.predict(100, 0.9)
 
             av_pred = pred[-1][AngleVector]
